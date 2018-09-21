@@ -6,6 +6,8 @@ class Player(Object):
     def __init__(self):
         super.__init__(self, None)
         self.hitbox = generate_rectangle_hitbox(8, 12)
+        self.offset_x = -4
+        self.offset_y = 4
         self.spritesheet = Spritesheet.spritesheets[1]
         self.states = {
             "stop_left": (False, (0, 0)),

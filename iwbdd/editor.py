@@ -2,6 +2,7 @@ from .background import Background
 from .tileset import Tileset
 from .screen import Screen, Collision
 from .world import World
+from .player import Player
 import pygame
 from pygame.locals import K_m
 
@@ -75,6 +76,7 @@ class Editor:
         }
         self.collision_editor = 0
         self.screen_seg = main_loop.segment_window(0, 0, 1024, 768)
+        self.player = Player()
 
         try:
             fh = open(world_file, 'rb')
@@ -162,7 +164,12 @@ class Editor:
             if Collision(self.collision_editor) in Editor.collision_editor_draw:
                 Editor.collision_editor_draw[c](wnd)
         if self.edited_world.starting_screen_id == self.edited_screen.screen_id:
-            pygame.draw.circle(self.screen_seg.display, (0, 255, 0), (self.edited_world.start_x, self.edited_world.start_y), 7)
+            self.player.x = self.edited_world.start_x
+            self.player.y = self.edited_world.start_y
+            if self.editing_mode == 0:
+                self.player.draw(self.screen_seg)
+            elif self.editing_mode == 1:
+                self.player.draw_as_hitbox(self.screen_seg, (0, 255, 0))
 
         scr_id_text = self.font.render("Screen id: {0}".format(self.edited_screen.screen_id), True, (255, 255, 255), 0)
         wnd.display.blit(scr_id_text, (1080, 320))

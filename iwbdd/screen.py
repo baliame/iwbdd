@@ -25,6 +25,13 @@ class Collision(IntEnum):
     COLLISION_TYPE_COUNT = auto()
 
 
+class CollisionTest(IntEnum):
+    PASSABLE = 0
+    SOLID = 1
+    DEADLY = 2
+    ALL_FLAGS = CollisionTest.SOLID | CollisionTest.DEADLY
+
+
 class Screen:
     SCREEN_W = 64
     SCREEN_H = 48
@@ -159,6 +166,55 @@ class Screen:
     def render_objects(self, wnd):
         pass
 
+    def ensure_unscaled_collisions(self):
+        if self.dirty_collisions or self.pre_rendered_unscaled_collisions is None:
+            if self.pre_rendered_unscaled_collisions is None:
+                self.pre_rendered_unscaled_collisions = pygame.Surface((1024, 768))
+            self.pre_rendered_unscaled_collisions.fill((255, 255, 255))
+            for y in range(Screen.SCREEN_H):
+                for x in range(Screen.SCREEN_W):
+                    tile = self.tiles[y][x]
+                    dest_x = x * Tileset.TILE_W
+                    dest_y = y * Tileset.TILE_H
+                    Screen.collision_overlays[Collision(tile[2])](self.pre_rendered_unscaled_collisions, dest_x, dest_y)
+            self.dirty_collisions = False
+            return True
+        return False
+
+    def access_collision(self):
+        self.ensure_unscaled_collisions()
+        return pygame.PixelArray(self.pre_rendered_unscaled_collisions)
+
+    def test_terrain_collision(self, x, y, hitbox):
+        h = len(hitbox)
+        w = len(hitbox[0])
+        coll = [0, 0, 0, 0, 0]
+        cap = CollisionTest.ALL_FLAGS
+        with self.access_collision() as pixels:
+            deadlyc = self.pre_rendered_unscaled_collisions.map_rgb((255, 0, 0))
+            solidc = self.pre_rendered_unscaled_collisions.map_rgb((0, 0, 255))
+            for yo in range(h):
+                cy = y + yo
+                for xo in range(w):
+                    if hitbox[yo][xo]:
+                        cx = x + xo
+                        sat = 0
+                        for cxo, cyo, idx in [(1, 0, 0), (0, -1, 1), (-1, 0, 2), (0, 1, 3), (0, 0, 4)]:
+                            try:
+                                if pixels[cx + cxo, cy + cyo] == deadlyc:
+                                    coll[idx] |= CollisionTest.DEADLY
+                                elif pixels[cx + cxo, cy + cyo] == solidc:
+                                    coll[idx] |= CollisionTest.SOLID
+                            except IndexError:
+                                pass
+                            if coll[idx] == cap:
+                                sat += 1
+                        if sat == len(coll):
+                            break
+                if sat == len(coll):
+                    break
+        return coll
+
     def render_collisions_to_window(self, wnd):
         win_w = wnd.display.get_width()
         win_h = wnd.display.get_height()
@@ -171,19 +227,8 @@ class Screen:
         else:
             pr_w = win_w
             pr_h = win_h
-        if self.dirty_collisions or self.pre_rendered_unscaled_collisions is None:
-            if self.pre_rendered_unscaled_collisions is None:
-                self.pre_rendered_unscaled_collisions = pygame.Surface((1024, 768))
-            self.pre_rendered_unscaled_collisions.fill((255, 255, 255))
-            for y in range(Screen.SCREEN_H):
-                for x in range(Screen.SCREEN_W):
-                    tile = self.tiles[y][x]
-                    dest_x = x * Tileset.TILE_W
-                    dest_y = y * Tileset.TILE_H
-                    Screen.collision_overlays[Collision(tile[2])](self.pre_rendered_unscaled_collisions, dest_x, dest_y)
-            self.dirty_collisions = False
-            resizing = True
-        if resizing or self.pre_rendered is None:
+        resizing = self.ensure_unscaled_collisions() or resizing
+        if resizing or self.pre_rendered_collisions is None:
             self.pre_rendered_collisions = pygame.Surface((win_w, win_h))
             pygame.transform.smoothscale(self.pre_rendered_unscaled_collisions, (win_w, win_h), self.pre_rendered_collisions)
             self.pre_rendered_collisions.set_alpha(128)
