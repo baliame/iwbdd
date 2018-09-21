@@ -8,6 +8,8 @@ class Window:
     def __init__(self, w, h, title="pygame window"):
         if Window.instance is not None:
             raise RuntimeError("Window must be a singleton.")
+        self.x = 0
+        self.y = 0
         self.w = w
         self.h = h
         self.display = pygame.display.set_mode((w, h))
@@ -17,7 +19,7 @@ class Window:
         pygame.display.update()
 
 
-class WindowSection:
+class WindowSection(Window):
     def __init__(self, window, x, y, w, h):
         self.x = x
         self.y = y

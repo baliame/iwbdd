@@ -1,4 +1,6 @@
 from .pygame_oo.main_loop import render_sync_stamp
+from .pygame.locals import SRCALPHA
+import pygame
 
 
 def generate_rectangle_hitbox(w, h):
@@ -14,8 +16,8 @@ class Object:
         self.screen = screen
         self.x = x
         self.y = y
-        self.offset_x = 0
-        self.offset_y = 0
+        self._offset_x = 0
+        self._offset_y = 0
         self.hidden = False
         self.spritesheet = None
         self.states = {}
@@ -25,6 +27,28 @@ class Object:
         self.last_sync_stamp = render_sync_stamp
         self.hitbox = None
 
+        self.hbds_dirty = True
+        self.hitbox_draw_surface = None
+        self.hitbox_draw_surface_color = None
+
+    @property
+    def offset_x(self):
+        return self._offset_x
+
+    @offset_x.setter
+    def offset_x(self, value):
+        self.hbds_dirty = True
+        self._offset_x = value
+
+    @property
+    def offset_y(self):
+        return self._offset_y
+
+    @offset_y.setter
+    def offset_y(self, value):
+        self.hbds_dirty = True
+        self._offset_y = value
+
     def change_state(self, newstate):
         self.state = newstate
         self.time_accumulator = 0
@@ -32,8 +56,8 @@ class Object:
 
     def draw(self, wnd):
         if not self.hidden and self.spritesheet is not None and self.state in self.states:
-            draw_x = self.x + self.offset_x
-            draw_y = self.y + self.offset_y
+            draw_x = self.x + self._offset_x
+            draw_y = self.y + self._offset_y
             state = self.states[self.state]
             if state[0]:
                 self.time_accumulator += render_sync_stamp - self.last_sync_stamp
@@ -56,3 +80,20 @@ class Object:
                 self.spritesheet.draw_cell_to(wnd.display, state[2][self.animation_frame][0], state[2][self.animation_frame][1], draw_x, draw_y)
             else:
                 self.spritesheet.draw_cell_to(wnd.display, state[1][0], state[1][1], draw_x, draw_y)
+
+    def draw_as_hitbox(self, wnd, color):
+        if self.hitbox is None:
+            return
+        if self.hbds_dirty or self.hitbox_draw_surface is None or color != self.hitbox_draw_surface_color:
+            h = len(self.hitbox)
+            w = len(self.hitbox[0])
+            self.hitbox_draw_surface = pygame.Surface(w, h, SRCALPHA)
+            self.hitbox_draw_surface_color = color
+            self.hbds_dirty = False
+            with pygame.PixelArray(self.hitbox_draw_surface) as hdpa:
+                hdpa[:] = (255, 255, 255, 0)
+                for yo in range(h):
+                    for xo in range(w):
+                        if self.hitbox[yo][xo]:
+                            hdpa[xo, yo] = (color[0], color[1], color[2], 255)
+        wnd.display.blit(self.hitbox_draw_surface, (self.x, self.y))
