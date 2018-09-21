@@ -1,5 +1,5 @@
 from .pygame_oo.main_loop import render_sync_stamp
-from .pygame.locals import SRCALPHA
+from pygame.locals import SRCALPHA
 import pygame
 
 
@@ -27,6 +27,8 @@ class Object:
         self.last_sync_stamp = render_sync_stamp
         self.hitbox = None
 
+        self.hb_bg_w = 0
+        self.hb_bg_h = 0
         self.hbds_dirty = True
         self.hitbox_draw_surface = None
         self.hitbox_draw_surface_color = None
@@ -87,13 +89,21 @@ class Object:
         if self.hbds_dirty or self.hitbox_draw_surface is None or color != self.hitbox_draw_surface_color:
             h = len(self.hitbox)
             w = len(self.hitbox[0])
-            self.hitbox_draw_surface = pygame.Surface(w, h, SRCALPHA)
+            self.hitbox_draw_surface = pygame.Surface((w if w > self.hb_bg_w else self.hb_bg_w, h if h > self.hb_bg_h else self.hb_bg_h), SRCALPHA)
             self.hitbox_draw_surface_color = color
             self.hbds_dirty = False
             with pygame.PixelArray(self.hitbox_draw_surface) as hdpa:
-                hdpa[:] = (255, 255, 255, 0)
+                fill = (color[0], color[1], color[2], 0) if self.hb_bg_w == 0 or self.hb_bg_h == 0 else (color[0], color[1], color[2], 64)
+                hdpa[:] = fill
                 for yo in range(h):
                     for xo in range(w):
                         if self.hitbox[yo][xo]:
-                            hdpa[xo, yo] = (color[0], color[1], color[2], 255)
-        wnd.display.blit(self.hitbox_draw_surface, (self.x, self.y))
+                            if self.hb_bg_w == 0 or self.hb_bg_h == 0:
+                                hdpa[xo, yo] = (color[0], color[1], color[2], 255)
+                            else:
+                                hdpa[xo + abs(self._offset_x), yo + abs(self._offset_y)] = (color[0], color[1], color[2], 255)
+        if self.hb_bg_w == 0 or self.hb_bg_h == 0:
+            dest = (self.x, self.y)
+        else:
+            dest = (self.x + self._offset_x, self.y + self._offset_y)
+        wnd.display.blit(self.hitbox_draw_surface, dest)

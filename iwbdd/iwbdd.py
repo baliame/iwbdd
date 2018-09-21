@@ -1,9 +1,9 @@
 from .pygame_oo.window import Window
 from .pygame_oo.main_loop import MainLoop
 from pygame.locals import *
-from .tileset import pack_tilesets_from_files, read_tilesets, Tileset
-from .background import pack_backgrounds_from_files, read_backgrounds, Background
-from .spritesheet import pack_spritesheets_from_files, Spritesheet
+from .tileset import pack_tilesets_from_files, read_tilesets
+from .background import pack_backgrounds_from_files, read_backgrounds
+from .spritesheet import pack_spritesheets_from_files, read_spritesheets
 from .editor import Editor
 import sys
 

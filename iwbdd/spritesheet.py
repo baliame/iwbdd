@@ -10,7 +10,7 @@ import os.path as path
 # SPRITESHEET: (HEADER, RAW DATA)
 # SPRITESHEET HEADER: (<4> Spritesheet ID, <4> Sprite cell width, <4> Sprite cell height, <4> Raw data length)
 # SPRITESHEET RAW DATA: raw PNG
-def read_spritesheet_data(source):
+def read_spritesheets(source):
     with open(source, 'rb') as f:
         tileset_cnt = struct.unpack('<L', eofc_read(f, 4))[0]
         for i in range(tileset_cnt):

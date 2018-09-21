@@ -29,7 +29,9 @@ class CollisionTest(IntEnum):
     PASSABLE = 0
     SOLID = 1
     DEADLY = 2
-    ALL_FLAGS = CollisionTest.SOLID | CollisionTest.DEADLY
+
+
+COLLISIONTEST_ALL_FLAGS = CollisionTest.SOLID | CollisionTest.DEADLY
 
 
 class Screen:
@@ -189,7 +191,7 @@ class Screen:
         h = len(hitbox)
         w = len(hitbox[0])
         coll = [0, 0, 0, 0, 0]
-        cap = CollisionTest.ALL_FLAGS
+        cap = COLLISIONTEST_ALL_FLAGS
         with self.access_collision() as pixels:
             deadlyc = self.pre_rendered_unscaled_collisions.map_rgb((255, 0, 0))
             solidc = self.pre_rendered_unscaled_collisions.map_rgb((0, 0, 255))
