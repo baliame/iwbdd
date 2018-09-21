@@ -21,7 +21,8 @@ setup(
     entry_points={
         'console_scripts': [
             'iwbdd_tsp=iwbdd.iwbdd:pack_tilesets',
-            'iwbdd_bgp=iwbdd.iwbdd:pack_backgrounds'
+            'iwbdd_bgp=iwbdd.iwbdd:pack_backgrounds',
+            'iwbdd_ssp=iwbdd.iwbdd:pack_spritesheets'
         ],
         'gui_scripts': [
             'iwbdd=iwbdd.iwbdd:main',
