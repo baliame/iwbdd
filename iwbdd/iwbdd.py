@@ -99,6 +99,7 @@ def pack_backgrounds():
         id_cntr += 1
     pack_backgrounds_from_files(srcfiles, destfile)
 
+
 def pack_spritesheets():
     m = MainLoop()
     m.init()

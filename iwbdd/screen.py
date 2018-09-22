@@ -32,6 +32,7 @@ class CollisionTest(IntEnum):
 
 
 COLLISIONTEST_ALL_FLAGS = CollisionTest.SOLID | CollisionTest.DEADLY
+COLLISIONTEST_PREVENTS_MOVEMENT = CollisionTest.SOLID
 
 
 class Screen:
@@ -196,7 +197,12 @@ class Screen:
         wnd.display.blit(self.pre_rendered, (0, 0))
 
     def render_objects(self, wnd):
-        pass
+        for obj in self.objects:
+            obj.draw(wnd)
+
+    def render_objects_hitboxes(self, wnd):
+        for obj in self.objects:
+            obj.draw_as_hitbox(wnd, (0, 255, 0))
 
     def ensure_unscaled_collisions(self):
         if self.dirty_collisions or self.pre_rendered_unscaled_collisions is None:
@@ -210,10 +216,6 @@ class Screen:
                     dest_y = y * Tileset.TILE_H
                     Screen.collision_overlays[Collision(tile[2])](self.pre_rendered_unscaled_collisions, dest_x, dest_y)
             self.dirty_collisions = False
-            deadlyc = self.pre_rendered_unscaled_collisions.map_rgb((255, 0, 0))
-            solidc = self.pre_rendered_unscaled_collisions.map_rgb((0, 0, 255))
-            print(deadlyc)
-            print(solidc)
             return True
         return False
 

@@ -1,7 +1,6 @@
 import pygame
 from pygame.locals import *
 from .window import WindowSection
-import time
 
 
 render_sync_stamp = 0
@@ -16,6 +15,8 @@ class MainLoop:
         MainLoop.instance = self
         self.was_init = False
         self.window = None
+        self.suspend_ticking = False
+        self.tickers = []
         self.updatables = []
         self.renderers = []
         self.atexit = []
@@ -24,7 +25,8 @@ class MainLoop:
         self.mouse_button_up_handler = None
         self.mouse_motion_handler = None
         self.prepare_exit = False
-        self.render_sync_stamp = time.time()
+        self.render_sync_stamp = 0
+        self.clock = pygame.time.Clock()
 
     def init(self):
         if self.was_init:
@@ -37,6 +39,8 @@ class MainLoop:
         init_font = pygame.font.init()
         if init_font is not None:
             raise RuntimeError("Pygame font failed to initialize: {0}".format(init_font))
+
+        self.render_sync_stamp = pygame.time.get_ticks() / 1000
 
         self.was_init = True
 
@@ -65,6 +69,9 @@ class MainLoop:
     def add_render_callback(self, cb):
         self.renderers.append(cb)
 
+    def add_ticker(self, cb):
+        self.tickers.append(cb)
+
     def set_keydown_handler(self, key, cb):
         self.keydown_handlers[key] = cb
 
@@ -83,6 +90,7 @@ class MainLoop:
     def start(self):
         global render_sync_stamp
         while True:
+            self.clock.tick(60)
             for event in pygame.event.get():
                 if event.type == QUIT:
                     self.break_main_loop()
@@ -100,7 +108,10 @@ class MainLoop:
                     cb(self)
                 break
             self.window.display.fill(0)
-            render_sync_stamp = time.time()
+            render_sync_stamp = pygame.time.get_ticks() / 1000
+            if not self.suspend_ticking:
+                for ticker in self.tickers:
+                    ticker(self)
             for renderer in self.renderers:
                 renderer(self.window)
             for updatable in self.updatables:

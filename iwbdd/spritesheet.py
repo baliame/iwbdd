@@ -3,6 +3,7 @@ import struct
 import pygame
 from io import BytesIO
 import os.path as path
+from pygame.locals import BLEND_RGB_MULT
 
 
 # DATA FORMAT: (HEADER, [SPRITESHEETS])
@@ -51,8 +52,11 @@ class Spritesheet:
     def __init__(self, reader=None):
         self.spritesheet_id = 0
         self.image_surface = None
+        self.image_surface_colored = None
         self.cell_w = 0
         self.cell_h = 0
+        self.applied_color = None
+        self._applied_color = None
         if reader is not None:
             self.read_spritesheet_data(reader)
 
@@ -64,5 +68,15 @@ class Spritesheet:
         raw_png = eofc_read(reader, data_len)
         self.image_surface = pygame.image.load(BytesIO(raw_png)).convert_alpha()
 
+    def check_applied_color(self):
+        if self.image_surface_colored is None or self.applied_color != self._applied_color:
+            self.image_surface_colored = self.image_surface.copy()
+            if self.applied_color is not None:
+                temp = pygame.Surface(self.image_surface_colored.get_size())
+                temp.fill(self.applied_color)
+                self.image_surface_colored.blit(temp, (0, 0), None, BLEND_RGB_MULT)
+            self._applied_color = self.applied_color
+
     def draw_cell_to(self, target, x, y, draw_x, draw_y):
-        target.blit(self.image_surface, (draw_x, draw_y), pygame.Rect(x * self.cell_w, y * self.cell_h, self.cell_w, self.cell_h))
+        self.check_applied_color()
+        target.blit(self.image_surface_colored, (draw_x, draw_y), pygame.Rect(x * self.cell_w, y * self.cell_h, self.cell_w, self.cell_h))
