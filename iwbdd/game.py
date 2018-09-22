@@ -4,7 +4,6 @@ from .player import Player
 
 class Controller:
     instance = None
-    gravity = (0, 0.2)
     terminal_velocity = 3
 
     def __init__(self, main_loop):
@@ -36,6 +35,8 @@ class Controller:
             self.player = Player()
 
     def simulate(self):
+        if self.player.cached_collision is None:
+            self.player.cached_collision = self.current_screen.test_terrain_collision(self.player.x, self.player.y, self.player.hitbox)
         pass
 
     @staticmethod

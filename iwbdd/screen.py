@@ -56,6 +56,11 @@ class Screen:
         Collision.SOLID_HALF_RIGHT_DEADLY_HALF_LEFT: lambda tgt, x, y: pygame.draw.rect(tgt, (255, 0, 0), pygame.Rect(x, y, Tileset.TILE_W / 2, Tileset.TILE_H)) and pygame.draw.rect(tgt, (0, 0, 255), pygame.Rect(x + Tileset.TILE_W / 2 - 1, y, Tileset.TILE_W / 2, Tileset.TILE_H)),
     }
 
+    collision_test_flags = {
+        0xFF0000: CollisionTest.DEADLY,
+        0x0000FF: CollisionTest.SOLID,
+    }
+
     def __init__(self, world, tile_data=None):
         self.world = world
         self.screen_id = None
@@ -70,10 +75,11 @@ class Screen:
         self.flags = 0
         self.tiles = [[(0, 0, 0) for x in range(Screen.SCREEN_W)] for y in range(Screen.SCREEN_H)]
         self.objects = []
+        self.gravity = (0, 0.2)
         if tile_data is not None:
             self.load_tile_data(tile_data)
 
-    def _read_header(self, reader):
+    def _read_header_v1(self, reader):
         scrid = struct.unpack("<L", eofc_read(reader, 4))[0]
         tr_e = struct.unpack("<L", eofc_read(reader, 4))[0]
         tr_n = struct.unpack("<L", eofc_read(reader, 4))[0]
@@ -81,7 +87,27 @@ class Screen:
         tr_s = struct.unpack("<L", eofc_read(reader, 4))[0]
         background_id = struct.unpack("<L", eofc_read(reader, 4))[0]
         flags = struct.unpack("<L", eofc_read(reader, 4))[0]
-        return (scrid, tr_e, tr_n, tr_w, tr_s, background_id, flags)
+        return (scrid, tr_e, tr_n, tr_w, tr_s, background_id, flags, 0, 0.2)
+
+    def _read_header_v2(self, reader):
+        scrid = struct.unpack("<L", eofc_read(reader, 4))[0]
+        tr_e = struct.unpack("<L", eofc_read(reader, 4))[0]
+        tr_n = struct.unpack("<L", eofc_read(reader, 4))[0]
+        tr_w = struct.unpack("<L", eofc_read(reader, 4))[0]
+        tr_s = struct.unpack("<L", eofc_read(reader, 4))[0]
+        background_id = struct.unpack("<L", eofc_read(reader, 4))[0]
+        flags = struct.unpack("<L", eofc_read(reader, 4))[0]
+        grav_x = struct.unpack("<f", eofc_read(reader, 4))[0]
+        grav_y = struct.unpack("<f", eofc_read(reader, 4))[0]
+        return (scrid, tr_e, tr_n, tr_w, tr_s, background_id, flags, grav_x, grav_y)
+
+    def _read_header(self, reader, legacy=False):
+        if legacy:
+            return self._read_header_v1(reader)
+        else:
+            ver = struct.unpack("<H", eofc_read(reader, 2))[0]
+            if ver == 2:
+                return self._read_header_v2(reader)
 
     def _read_tile(self, reader):
         ts_x = struct.unpack("<H", eofc_read(reader, 2))[0]
@@ -90,6 +116,7 @@ class Screen:
         return (ts_x, ts_y, collision)
 
     def _write_header(self, writer):
+        writer.write(struct.pack("<H", 2))
         writer.write(struct.pack("<L", self.screen_id))
         writer.write(struct.pack("<L", self.transitions[0]))
         writer.write(struct.pack("<L", self.transitions[1]))
@@ -97,6 +124,8 @@ class Screen:
         writer.write(struct.pack("<L", self.transitions[3]))
         writer.write(struct.pack("<L", self.background.background_id))
         writer.write(struct.pack("<L", self.flags))
+        writer.write(struct.pack("<f", self.gravity[0]))
+        writer.write(struct.pack("<f", self.gravity[1]))
 
     def _write_tile(self, writer, tile):
         writer.write(struct.pack("<H", tile[0]))
@@ -121,6 +150,7 @@ class Screen:
             self.background = Background.find(header[5])
             self.flags = header[6]
             self.tiles = tiles
+            self.gravity = (header[7], header[8])
         else:
             self.screen_id = tile_data[0][0]
             self.transitions = (tile_data[0][1], tile_data[0][2], tile_data[0][3], tile_data[0][4])
@@ -180,6 +210,10 @@ class Screen:
                     dest_y = y * Tileset.TILE_H
                     Screen.collision_overlays[Collision(tile[2])](self.pre_rendered_unscaled_collisions, dest_x, dest_y)
             self.dirty_collisions = False
+            deadlyc = self.pre_rendered_unscaled_collisions.map_rgb((255, 0, 0))
+            solidc = self.pre_rendered_unscaled_collisions.map_rgb((0, 0, 255))
+            print(deadlyc)
+            print(solidc)
             return True
         return False
 
@@ -187,14 +221,13 @@ class Screen:
         self.ensure_unscaled_collisions()
         return pygame.PixelArray(self.pre_rendered_unscaled_collisions)
 
+    # coll: (flags, solid count, solid min yo, solid max yo) [E, N, W, S, overlap]
     def test_terrain_collision(self, x, y, hitbox):
         h = len(hitbox)
         w = len(hitbox[0])
-        coll = [0, 0, 0, 0, 0]
+        coll = [(0, 0, -1, -1), (0, 0, -1, -1), (0, 0, -1, -1), (0, 0, -1, -1), (0, 0, -1, -1)]
         cap = COLLISIONTEST_ALL_FLAGS
         with self.access_collision() as pixels:
-            deadlyc = self.pre_rendered_unscaled_collisions.map_rgb((255, 0, 0))
-            solidc = self.pre_rendered_unscaled_collisions.map_rgb((0, 0, 255))
             for yo in range(h):
                 cy = y + yo
                 for xo in range(w):
@@ -203,10 +236,15 @@ class Screen:
                         sat = 0
                         for cxo, cyo, idx in [(1, 0, 0), (0, -1, 1), (-1, 0, 2), (0, 1, 3), (0, 0, 4)]:
                             try:
-                                if pixels[cx + cxo, cy + cyo] == deadlyc:
-                                    coll[idx] |= CollisionTest.DEADLY
-                                elif pixels[cx + cxo, cy + cyo] == solidc:
-                                    coll[idx] |= CollisionTest.SOLID
+                                px = pixels[cx + cxo, cy + cyo]
+                                if px in Screen.collision_test_flags:
+                                    flag = Screen.collision_test_flags[px]
+                                    coll[idx] = (coll[idx][0] | Screen.collision_test_flags[px], coll[idx][1], coll[idx][2], coll[idx][3])
+                                    if flag == CollisionTest.SOLID:
+                                        cnt = coll[idx][1] + 1
+                                        min_yo = yo + cyo if coll[idx][2] == -1 or coll[idx][2] > yo + cyo else coll[idx][2]
+                                        max_yo = yo + cyo if coll[idx][3] == -1 or coll[idx][3] < yo + cyo else coll[idx][3]
+                                        coll[idx] = (coll[idx][0], cnt, min_yo, max_yo)
                             except IndexError:
                                 pass
                             if coll[idx] == cap:
