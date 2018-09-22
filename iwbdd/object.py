@@ -57,9 +57,11 @@ class Object:
         self.animation_frame = 0
 
     def draw(self, wnd):
+        ix = int(self.x)
+        iy = int(self.y)
         if not self.hidden and self.spritesheet is not None and self.state in self.states:
-            draw_x = self.x + self._offset_x
-            draw_y = self.y + self._offset_y
+            draw_x = ix + self._offset_x
+            draw_y = iy + self._offset_y
             state = self.states[self.state]
             if state[0]:
                 self.time_accumulator += render_sync_stamp - self.last_sync_stamp
@@ -84,6 +86,8 @@ class Object:
                 self.spritesheet.draw_cell_to(wnd.display, state[1][0], state[1][1], draw_x, draw_y)
 
     def draw_as_hitbox(self, wnd, color):
+        ix = int(self.x)
+        iy = int(self.y)
         if self.hitbox is None:
             return
         if self.hbds_dirty or self.hitbox_draw_surface is None or color != self.hitbox_draw_surface_color:
@@ -103,7 +107,7 @@ class Object:
                             else:
                                 hdpa[xo + abs(self._offset_x), yo + abs(self._offset_y)] = (color[0], color[1], color[2], 255)
         if self.hb_bg_w == 0 or self.hb_bg_h == 0:
-            dest = (self.x, self.y)
+            dest = (ix, iy)
         else:
-            dest = (self.x + self._offset_x, self.y + self._offset_y)
+            dest = (ix + self._offset_x, iy + self._offset_y)
         wnd.display.blit(self.hitbox_draw_surface, dest)

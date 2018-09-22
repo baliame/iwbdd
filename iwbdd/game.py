@@ -1,8 +1,11 @@
 from .world import World
+from .player import Player
 
 
 class Controller:
     instance = None
+    gravity = (0, 0.2)
+    terminal_velocity = 3
 
     def __init__(self, main_loop):
         if Controller.instance is not None:
@@ -13,12 +16,27 @@ class Controller:
         self.current_world = None
         self.current_screen = None
 
+        self.player = None
+
+    def add_loaded_world(self, world):
+        self.worlds.append(world)
+        if self.current_world is None:
+            self.current_world = world
+            self.current_screen = self.current_world.screens[self.current_world.starting_screen_id]
+
     def load_world_from_file(self, world):
         loaded_world = World(world)
         self.worlds.append(loaded_world)
         if self.current_world is None:
             self.current_world = loaded_world
             self.current_screen = self.current_world.screens[self.current_world.starting_screen_id]
+
+    def create_player(self):
+        if self.player is None:
+            self.player = Player()
+
+    def simulate(self):
+        pass
 
     @staticmethod
     def render_elements_callback(wnd):
