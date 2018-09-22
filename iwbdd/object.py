@@ -21,7 +21,7 @@ class Object:
         self.hidden = False
         self.spritesheet = None
         self.states = {}
-        self.state = ""
+        self._state = ""
         self.animation_frame = 0
         self.time_accumulator = 0
         self.last_sync_stamp = render_sync_stamp
@@ -51,18 +51,23 @@ class Object:
         self.hbds_dirty = True
         self._offset_y = value
 
-    def change_state(self, newstate):
-        self.state = newstate
+    @property
+    def state(self):
+        return self._state
+
+    @state.setter
+    def state(self, newstate):
+        self._state = newstate
         self.time_accumulator = 0
         self.animation_frame = 0
 
     def draw(self, wnd):
         ix = int(self.x)
         iy = int(self.y)
-        if not self.hidden and self.spritesheet is not None and self.state in self.states:
+        if not self.hidden and self.spritesheet is not None and self._state in self.states:
             draw_x = ix + self._offset_x
             draw_y = iy + self._offset_y
-            state = self.states[self.state]
+            state = self.states[self._state]
             if state[0]:
                 self.time_accumulator += render_sync_stamp - self.last_sync_stamp
                 self.last_sync_stamp = render_sync_stamp
@@ -76,7 +81,7 @@ class Object:
                     else:
                         self.animation_frame += 1
                         if self.animation_frame >= len(state[2]):
-                            self.state = state[3]
+                            self._state = state[3]
                             self.animation_frame = 0
                             self.draw(wnd)
                             return

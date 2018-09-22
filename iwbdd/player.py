@@ -21,7 +21,7 @@ class Player(Object):
             "moving_left": (True, 0.5, [(0, 1), (1, 1)], True),
             "moving_right": (True, 0.5, [(0, 0), (1, 0)], True),
         }
-        self.state = "stop_right"
+        self._state = "stop_right"
 
     def reset(self):
         self.movement_velocity = (0, 0)
