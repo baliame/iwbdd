@@ -1,6 +1,7 @@
-from .pygame_oo.main_loop import render_sync_stamp
+from .pygame_oo.main_loop import MainLoop
 from pygame.locals import SRCALPHA
 import pygame
+from .screen import CollisionTest
 
 
 def generate_rectangle_hitbox(w, h):
@@ -24,8 +25,9 @@ class Object:
         self._state = ""
         self.animation_frame = 0
         self.time_accumulator = 0
-        self.last_sync_stamp = render_sync_stamp
+        self.last_sync_stamp = MainLoop.render_sync_stamp
         self.hitbox = None
+        self.hitbox_type = CollisionTest.PASSABLE
 
         self.hb_bg_w = 0
         self.hb_bg_h = 0
@@ -60,6 +62,7 @@ class Object:
         self._state = newstate
         self.time_accumulator = 0
         self.animation_frame = 0
+        self.last_sync_stamp = MainLoop.render_sync_stamp
 
     def draw(self, wnd):
         ix = int(self.x)
@@ -69,8 +72,8 @@ class Object:
             draw_y = iy + self._offset_y
             state = self.states[self._state]
             if state[0]:
-                self.time_accumulator += render_sync_stamp - self.last_sync_stamp
-                self.last_sync_stamp = render_sync_stamp
+                self.time_accumulator += MainLoop.render_sync_stamp - self.last_sync_stamp
+                self.last_sync_stamp = MainLoop.render_sync_stamp
 
                 while state[1] > 0 and ((state[3] is False and self.animation_frame == len(state[2]) - 1) or state[3] is not False) and self.time_accumulator > state[1]:
                     self.time_accumulator -= state[1]

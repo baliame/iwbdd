@@ -1,6 +1,6 @@
 from .world import World
 from .player import Player
-from .screen import CollisionTest, COLLISIONTEST_PREVENTS_MOVEMENT
+from .screen import CollisionTest, COLLISIONTEST_PREVENTS_MOVEMENT, COLLISIONTEST_PREVENTS_SIDE_GRAVITY, COLLISIONTEST_TRANSITIONS, Screen
 import pygame
 from enum import IntEnum
 
@@ -22,7 +22,8 @@ class Controls(IntEnum):
 
 class Controller:
     instance = None
-    terminal_velocity = 4.4
+    # terminal_velocity = 4.4
+    terminal_velocity = 3.3
     doublejump_strength = 0.8
     default_keybindings = {
         Controls.LEFT: pygame.K_LEFT,
@@ -30,7 +31,7 @@ class Controller:
         Controls.JUMP: pygame.K_SPACE,
         Controls.SHOOT: pygame.K_a,
     }
-    movement_speed = 2
+    movement_speed = 1.5
 
     def __init__(self, main_loop):
         if Controller.instance is not None:
@@ -56,6 +57,7 @@ class Controller:
                 self.player.x = self.current_world.start_x
                 self.player.y = self.current_world.start_y
                 self.current_screen.objects.append(self.player)
+                self.player.screen = self.current_screen
 
     def load_world_from_file(self, world):
         loaded_world = World(world)
@@ -67,6 +69,7 @@ class Controller:
                 self.player.x = self.current_world.start_x
                 self.player.y = self.current_world.start_y
                 self.current_screen.objects.append(self.player)
+                self.player.screen = self.current_screen
 
     def create_player(self):
         if self.player is None:
@@ -75,12 +78,14 @@ class Controller:
                 self.player.x = self.current_world.start_x
                 self.player.y = self.current_world.start_y
                 self.current_screen.objects.append(self.player)
+            self.player.screen = self.current_screen
 
     def reset_from_editor(self, editor):
         self.player.reset()
         self.current_screen.objects.remove(self.player)
         self.current_world = editor.edited_world
         self.current_screen = self.current_world.screens[self.current_world.starting_screen_id]
+        self.player.screen = self.current_screen
         self.player.x = self.current_world.start_x
         self.player.y = self.current_world.start_y
         self.current_screen.objects.append(self.player)
@@ -89,14 +94,28 @@ class Controller:
     def start_from_editor(self, editor):
         self.suspended = False
 
+    def transition(self, id):
+        self.current_screen.objects.remove(self.player)
+        self.current_screen = self.current_world.screens[self.current_screen.transitions[id]]
+        if id == 0:
+            self.player.x = 0
+        elif id == 1:
+            self.player.y = Screen.SCREEN_SIZE_H - len(self.player.hitbox)
+        elif id == 2:
+            self.player.x = Screen.SCREEN_SIZE_W - len(self.player.hitbox[0])
+        elif id == 3:
+            self.player.y = 0
+        self.current_screen.objects.append(self.player)
+
     def simulate(self):
         if self.suspended:
             return
         if self.player.dead:
             return
+        self.current_screen.generate_object_collisions()
         # print("==== Running simulation for frame")
         if self.player.cached_collision is None:
-            self.player.cached_collision = self.current_screen.test_terrain_collision(int(self.player.x), int(self.player.y), self.player.hitbox)
+            self.player.cached_collision = self.current_screen.test_screen_collision(int(self.player.x), int(self.player.y), self.player.hitbox)
             # print("Checking initial collision at {0} {1} - result: {2}".format(int(self.player.x), int(self.player.y), self.player.cached_collision))
         if self.player.cached_collision[4][0] & CollisionTest.DEADLY:
             self.player.die()
@@ -107,14 +126,33 @@ class Controller:
             self.player.cached_collision = None
             # print("Frame failed: player overlapping solid object")
             return
+        if self.player.cached_collision[4][0] & COLLISIONTEST_TRANSITIONS:
+            if self.player.cached_collision[4][0] & CollisionTest.TRANSITION_EAST and self.current_screen.transitions[0]:
+                self.transition(0)
+                self.player.cached_collision = None
+                return
+            elif self.player.cached_collision[4][0] & CollisionTest.TRANSITION_NORTH and self.current_screen.transitions[1]:
+                self.transition(1)
+                self.player.cached_collision = None
+                return
+            elif self.player.cached_collision[4][0] & CollisionTest.TRANSITION_WEST and self.current_screen.transitions[2]:
+                self.transition(2)
+                self.player.cached_collision = None
+                return
+            elif self.player.cached_collision[4][0] & CollisionTest.TRANSITION_SOUTH and self.current_screen.transitions[3]:
+                self.transition(3)
+                self.player.cached_collision = None
+                return
+            else:
+                print("BUG: Collision flag {0} but no valid transition in direction(s)".format(self.player.cached_collision[4][0]))
         cancel_dirs = []
         grav_dirs = []
         gx = self.current_screen.gravity[0]
         gy = self.current_screen.gravity[1]
         gv = self.player.gravity_velocity
         tv = Controller.terminal_velocity
+        prevent_doublejump = False
         # gv = [bound(gv[0] + gx, -tv if gx < 0 else -2 * tv, tv if gx > 0 else 2 * tv), bound(gv[1] + gy, -tv if gy < 0 else -2 * tv, tv if gy > 0 else 2 * tv)]
-        gv = [bound(gv[0] + gx, -tv, tv), bound(gv[1] + gy, -tv, tv)]
         if gx != 0:
             if gx < 0:
                 grav_dirs.append(2)
@@ -125,38 +163,45 @@ class Controller:
                 grav_dirs.append(1)
             else:
                 grav_dirs.append(3)
-        if gv[0] != 0:
-            if gv[0] < 0:
-                cancel_dirs.append(2)
-            else:
-                cancel_dirs.append(0)
-        if gv[1] != 0:
-            if gv[1] < 0:
-                cancel_dirs.append(1)
-            else:
-                cancel_dirs.append(3)
         jump_available = False
-        for el in cancel_dirs:
-            if self.player.cached_collision[el][0] & COLLISIONTEST_PREVENTS_MOVEMENT:
-                if el in (0, 2):
-                    gv[0] = 0
+        if self.player.cached_collision[0][0] & COLLISIONTEST_PREVENTS_SIDE_GRAVITY or self.player.cached_collision[2][0] & COLLISIONTEST_PREVENTS_SIDE_GRAVITY:
+            gv = [0, 0]
+            prevent_doublejump = True
+            self.player.jumping = False
+        else:
+            gv = [bound(gv[0] + gx, -tv, tv), bound(gv[1] + gy, -tv, tv)]
+            if gv[0] != 0:
+                if gv[0] < 0:
+                    cancel_dirs.append(2)
                 else:
-                    gv[1] = 0
+                    cancel_dirs.append(0)
+            if gv[1] != 0:
+                if gv[1] < 0:
+                    cancel_dirs.append(1)
+                else:
+                    cancel_dirs.append(3)
+            for el in cancel_dirs:
+                if self.player.cached_collision[el][0] & COLLISIONTEST_PREVENTS_MOVEMENT:
+                    if el in (0, 2):
+                        gv[0] = 0
+                    else:
+                        gv[1] = 0
         for el in grav_dirs:
             if self.player.cached_collision[el][0] & COLLISIONTEST_PREVENTS_MOVEMENT:
                 jump_available = True
-                self.player.doublejump_available = 1
+                if self.player.doublejump_available < 1:
+                    self.player.doublejump_available = 1
                 self.player.jumping = False
 
-        if gx:
-            tgvrx = tv / gx
-        else:
-            tgvrx = 0
+        # if gx:
+        #    tgvrx = tv / gx
+        # else:
+        #     tgvrx = 0
 
-        if gy:
-            tgvry = tv / gy
-        else:
-            tgvry = 0
+        # if gy:
+        #     tgvry = tv / gy
+        # else:
+        #     tgvry = 0
 
         mvx = 0
         mvy = 0
@@ -175,18 +220,22 @@ class Controller:
             if not self.player.jump_held:
                 self.player.jump_held = True
                 if jump_available:
-                    gv[0] += tgvrx * -gx
-                    gv[1] += tgvry * -gy
+                    # gv[0] += tgvrx * -gx
+                    # gv[1] += tgvry * -gy
+                    gv[0] += -gx * self.current_screen.jump_frames
+                    gv[1] += -gy * self.current_screen.jump_frames
                     self.player.jumping = True
-                elif self.player.doublejump_available > 0:
+                elif self.player.doublejump_available > 0 and not prevent_doublejump:
                     if gx:
                         if (gv[0] < 0 and gx < 0) or (gv[0] > 0 and gx > 0):
                             gv[0] = 0
                     if gy:
                         if (gv[1] < 0 and gy < 0) or (gv[1] > 0 and gy > 0):
                             gv[1] = 0
-                    gv[0] += tgvrx * -gx * Controller.doublejump_strength
-                    gv[1] += tgvry * -gy * Controller.doublejump_strength
+                    # gv[0] += tgvrx * -gx * Controller.doublejump_strength
+                    # gv[1] += tgvry * -gy * Controller.doublejump_strength
+                    gv[0] += -gx * self.current_screen.jump_frames * Controller.doublejump_strength
+                    gv[1] += -gy * self.current_screen.jump_frames * Controller.doublejump_strength
                     self.player.jumping = True
                     self.player.doublejump_available -= 1
         else:
@@ -204,6 +253,16 @@ class Controller:
         self.player.gravity_velocity = gv
         self.player.movement_velocity = [mvx, mvy]
 
+        conveyor_velocity = [0, 0]
+        if self.player.cached_collision[0][0] & CollisionTest.CONVEYOR_NORTH_SINGLE_SPEED or self.player.cached_collision[2][0] & CollisionTest.CONVEYOR_NORTH_SINGLE_SPEED:
+            conveyor_velocity[1] += -Controller.movement_speed * 0.75
+        if self.player.cached_collision[0][0] & CollisionTest.CONVEYOR_SOUTH_SINGLE_SPEED or self.player.cached_collision[2][0] & CollisionTest.CONVEYOR_SOUTH_SINGLE_SPEED:
+            conveyor_velocity[1] += Controller.movement_speed * 0.75
+        if self.player.cached_collision[3][0] & CollisionTest.CONVEYOR_WEST_SINGLE_SPEED:
+            conveyor_velocity[0] += -Controller.movement_speed * 0.75
+        if self.player.cached_collision[3][0] & CollisionTest.CONVEYOR_EAST_SINGLE_SPEED:
+            conveyor_velocity[0] += Controller.movement_speed * 0.75
+
         if change_facing:
             if change_facing < 0:
                 if self.player.state != "moving_left":
@@ -217,7 +276,7 @@ class Controller:
             else:
                 self.player.state = "stop_right"
 
-        sumv = (gv[0] + mvx, gv[1] + mvy)
+        sumv = (gv[0] + mvx + conveyor_velocity[0], gv[1] + mvy + conveyor_velocity[1])
         dest = [self.player.x + sumv[0], self.player.y + sumv[1]]
         cx = self.player.x
         cy = self.player.y
@@ -274,7 +333,7 @@ class Controller:
                 acc_ty = nyt
             else:
                 break
-            coll = self.current_screen.test_terrain_collision(pt[0], pt[1], self.player.hitbox)
+            coll = self.current_screen.test_screen_collision(pt[0], pt[1], self.player.hitbox)
             overlap = coll[4][0]
             if overlap & CollisionTest.DEADLY:
                 self.player.die()

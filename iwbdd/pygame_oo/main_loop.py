@@ -3,11 +3,9 @@ from pygame.locals import *
 from .window import WindowSection
 
 
-render_sync_stamp = 0
-
-
 class MainLoop:
     instance = None
+    render_sync_stamp = 0
 
     def __init__(self):
         if MainLoop.instance is not None:
@@ -25,7 +23,7 @@ class MainLoop:
         self.mouse_button_up_handler = None
         self.mouse_motion_handler = None
         self.prepare_exit = False
-        self.render_sync_stamp = 0
+        MainLoop.render_sync_stamp = 0
         self.clock = pygame.time.Clock()
 
     def init(self):
@@ -40,7 +38,7 @@ class MainLoop:
         if init_font is not None:
             raise RuntimeError("Pygame font failed to initialize: {0}".format(init_font))
 
-        self.render_sync_stamp = pygame.time.get_ticks() / 1000
+        MainLoop.render_sync_stamp = pygame.time.get_ticks() / 1000
 
         self.was_init = True
 
@@ -88,7 +86,6 @@ class MainLoop:
         self.atexit.append(cb)
 
     def start(self):
-        global render_sync_stamp
         while True:
             self.clock.tick(60)
             for event in pygame.event.get():
@@ -108,7 +105,7 @@ class MainLoop:
                     cb(self)
                 break
             self.window.display.fill(0)
-            render_sync_stamp = pygame.time.get_ticks() / 1000
+            MainLoop.render_sync_stamp = pygame.time.get_ticks() / 1000
             if not self.suspend_ticking:
                 for ticker in self.tickers:
                     ticker(self)
