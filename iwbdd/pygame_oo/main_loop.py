@@ -42,6 +42,9 @@ class MainLoop:
 
         self.was_init = True
 
+    def fps(self):
+        return int(self.clock.get_fps())
+
     def break_main_loop(self):
         self.prepare_exit = True
 
@@ -56,6 +59,10 @@ class MainLoop:
             raise RuntimeError("Set multiple windows.")
         self.window = w
         self.updatables.append(w)
+        w = w.get_parent()
+        while w is not None:
+            self.updatables.append(w)
+            w = w.get_parent()
 
     def segment_window(self, x, y, w, h):
         if self.window is None:
@@ -95,11 +102,11 @@ class MainLoop:
                     if event.key in self.keydown_handlers:
                         self.keydown_handlers[event.key](event, self)
                 elif event.type == MOUSEBUTTONDOWN and self.mouse_button_handler is not None:
-                    self.mouse_button_handler(event, self)
+                    self.mouse_button_handler(self.window.scale_event(event), self)
                 elif event.type == MOUSEBUTTONUP and self.mouse_button_up_handler is not None:
-                    self.mouse_button_up_handler(event, self)
+                    self.mouse_button_up_handler(self.window.scale_event(event), self)
                 elif event.type == MOUSEMOTION and self.mouse_motion_handler is not None:
-                    self.mouse_motion_handler(event, self)
+                    self.mouse_motion_handler(self.window.scale_event(event), self)
             if self.prepare_exit:
                 for cb in self.atexit:
                     cb(self)

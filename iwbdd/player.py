@@ -3,6 +3,8 @@ from .spritesheet import Spritesheet
 
 
 class Player(Object):
+    exclude_from_object_editor = True
+
     def __init__(self):
         super().__init__(None)
         self.bottom_pixel = 9

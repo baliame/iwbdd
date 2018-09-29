@@ -26,7 +26,8 @@ setup(
         ],
         'gui_scripts': [
             'iwbdd=iwbdd.iwbdd:main',
-            'iwbdd_editor=iwbdd.iwbdd:editor'
+            'iwbdd_editor=iwbdd.iwbdd:editor',
+            'iwbdd_editor_scaled=iwbdd.iwbdd:editor_scaled'
         ],
     }
 )

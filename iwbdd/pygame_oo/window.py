@@ -18,6 +18,35 @@ class Window:
     def update(self):
         pygame.display.update()
 
+    def create_scaler(self, dest_w, dest_h):
+        return WindowScaler(self, dest_w, dest_h)
+
+    def scale_event(self, ev):
+        return ev
+
+    def get_parent(self):
+        return None
+
+
+class WindowScaler:
+    def __init__(self, window, dest_w, dest_h):
+        self.display = pygame.Surface((dest_w, dest_h))
+        self.w = dest_w
+        self.h = dest_h
+        self.window = window
+        self.mult_x = dest_w / window.w
+        self.mult_y = dest_h / window.h
+
+    def update(self):
+        pygame.transform.smoothscale(self.display, (self.window.w, self.window.h), self.window.display)
+
+    def scale_event(self, ev):
+        ev.pos = [int(ev.pos[0] * self.mult_x), int(ev.pos[1] * self.mult_y)]
+        return ev
+
+    def get_parent(self):
+        return self.window
+
 
 class WindowSection(Window):
     def __init__(self, window, x, y, w, h):
@@ -30,3 +59,9 @@ class WindowSection(Window):
 
     def update(self):
         self.window.display.blit(self.display, (self.x, self.y))
+
+    def scale_event(self, ev):
+        return ev
+
+    def get_parent(self):
+        return self.window

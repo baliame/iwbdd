@@ -5,6 +5,8 @@ from .tileset import pack_tilesets_from_files, read_tilesets
 from .background import pack_backgrounds_from_files, read_backgrounds
 from .spritesheet import pack_spritesheets_from_files, read_spritesheets
 from .editor import Editor
+from .object import Object
+from . import object_importer
 import sys
 
 
@@ -33,6 +35,30 @@ def editor():
 
     w = Window(1600, 768, "IWBDD Editor")
     m.set_window(w)
+
+    read_tilesets("tilesets.tls")
+    read_backgrounds("backgrounds.bgs")
+    read_spritesheets("spritesheets.sss")
+
+    ed = Editor(sys.argv[1], m)
+    m.set_keydown_handler(K_ESCAPE, ml_exit_handler)
+    m.start()
+
+    m.quit()
+
+
+def editor_scaled():
+    m = MainLoop()
+    m.init()
+    if len(sys.argv) == 1:
+        print("Missing argument: world file")
+        sys.exit(2)
+
+    Object.enumerate_objects(Object)
+    print(Object.object_editor_items)
+    w = Window(1200, 576, "IWBDD Editor")
+    scaler = w.create_scaler(1600, 768)
+    m.set_window(scaler)
 
     read_tilesets("tilesets.tls")
     read_backgrounds("backgrounds.bgs")

@@ -2,10 +2,16 @@ from .pygame_oo.main_loop import MainLoop
 from pygame.locals import SRCALPHA
 import pygame
 from .screen import CollisionTest
+from enum import Enum
 
 
 def generate_rectangle_hitbox(w, h):
     return [[1 for x in range(w)] for y in range(h)]
+
+
+class EPType(Enum):
+    IntSelector = 1    # Arguments: default, min, max, step
+    PointSelector = 2  # Arguments: -
 
 
 # Object state
@@ -13,6 +19,21 @@ def generate_rectangle_hitbox(w, h):
 # Animated:   (True, animation_speed, [(sheet_cell_x, sheet_cell_y)...], looping [True|False|next animation state])
 
 class Object:
+    editor_properties = {}
+    editing_values = {}
+    exclude_from_object_editor = False
+    object_editor_items = None
+    no_properties_text = None
+
+    @staticmethod
+    def enumerate_objects(base_class):
+        if Object.object_editor_items is None:
+            Object.object_editor_items = []
+        for item in base_class.__subclasses__():
+            if not item.exclude_from_object_editor:
+                Object.object_editor_items.append(item)
+                Object.enumerate_objects(item)
+
     def __init__(self, screen, x=0, y=0):
         self.screen = screen
         self.x = x
@@ -119,3 +140,17 @@ class Object:
         else:
             dest = (ix + self._offset_x, iy + self._offset_y)
         wnd.display.blit(self.hitbox_draw_surface, dest)
+
+    @classmethod
+    def render_editor_properties(cls, surf, font, x, y, render_cache):
+        if cls.exclude_from_object_editor:
+            raise TypeError('{0} is a hidden object, should not be available in editor.'.format(cls))
+        if len(cls.editor_properties) == 0:
+            if Object.no_properties_text is None:
+                Object.no_properties_text = font.render("This object has configurable attributes.", True, (255, 255, 255), 0)
+            surf.blit(Object.no_properties_text, x, y)
+            return
+        for dest_var, spec in cls.editor_properties:
+            if spec[0] == EPType.IntSelector:
+                if dest_var not in cls.editing_values:
+                    cls.editing_values[dest_var] = spec[1]
