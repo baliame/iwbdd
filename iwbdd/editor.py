@@ -3,6 +3,7 @@ from .tileset import Tileset
 from .screen import Screen, Collision, COLLISIONTEST_COLORS, CollisionTest
 from .world import World
 from .game import Controller
+from .object import Object
 from enum import IntEnum
 import pygame
 from pygame.locals import K_f, K_m, K_r, K_s, K_x, K_n, K_LEFT, K_RIGHT, K_UP, K_DOWN, K_PAGEUP, K_PAGEDOWN, K_DELETE, K_RETURN, K_BACKSPACE, K_c, K_v, K_o, K_i
@@ -136,6 +137,11 @@ class Editor:
         main_loop.set_keydown_handler(Editor.key_mapping["delete_screen"], Editor.keydown_callback)
         main_loop.set_keydown_handler(Editor.key_mapping["confirm_prompt"], Editor.keydown_callback)
         main_loop.set_keydown_handler(Editor.key_mapping["cancel_prompt"], Editor.keydown_callback)
+        main_loop.set_keydown_handler(Editor.key_mapping["sm_cut"], Editor.keydown_callback)
+        main_loop.set_keydown_handler(Editor.key_mapping["sm_copy"], Editor.keydown_callback)
+        main_loop.set_keydown_handler(Editor.key_mapping["sm_paste"], Editor.keydown_callback)
+        main_loop.set_keydown_handler(Editor.key_mapping["sm_fill_terrain"], Editor.keydown_callback)
+        main_loop.set_keydown_handler(Editor.key_mapping["sm_fill_collision"], Editor.keydown_callback)
 
         self.main_loop = main_loop
         self.world_file = world_file
@@ -167,6 +173,8 @@ class Editor:
         self.sm_clipboard = None
         self.render_cache = {}
         self.build_render_cache()
+
+        self.objed_selection = None if Object.object_editor_items is None else Object.object_editor_items[0]
 
         try:
             fh = open(world_file, 'rb')
@@ -261,6 +269,11 @@ class Editor:
             "sel-resetc-passive": self.font.render("[Reset collision]", True, passive_color, 0),
             "sel-paste-active": self.font.render("[Paste] (V)", True, active_color, 0),
             "sel-paste-passive": self.font.render("[Paste] (V)", True, passive_color, 0),
+            "rac-active": self.font.render("[Render as collisions]", True, active_color, 0),
+            "rac-passive": self.font.render("[Render as collisions]", True, passive_color, 0),
+            "dec": self.font.render("[-]", True, (255, 255, 255), 0),
+            "inc": self.font.render("[+]", True, (255, 255, 255), 0),
+            "selectpt": self.font.render("[Select]", True, (255, 255, 255), 0),
         }
 
     @staticmethod
@@ -269,22 +282,15 @@ class Editor:
         self.render_elements(wnd)
 
     def render_elements(self, wnd):
-        # mode_text = self.font.render("Mode:", True, (255, 255, 255), 0)
         wnd.display.blit(self.render_cache["mode"], (1440, 320))
         passive_color = (128, 128, 128)
         active_color = (255, 255, 255)
-        # terrain_text = self.font.render("Terrain", True, active_color if self.editing_mode == EditingMode.TERRAIN else passive_color, 0)
         wnd.display.blit(self.render_cache["terrain-active"] if self.editing_mode == EditingMode.TERRAIN else self.render_cache["terrain-passive"], (1500, 320))
-        # collision_text = self.font.render("Collision", True, active_color if self.editing_mode == EditingMode.COLLISION else passive_color, 0)
         wnd.display.blit(self.render_cache["collision-active"] if self.editing_mode == EditingMode.COLLISION else self.render_cache["collision-passive"], (1500, 340))
-        # collision_text = self.font.render("Selection", True, active_color if self.editing_mode == EditingMode.SELECTION else passive_color, 0)
         wnd.display.blit(self.render_cache["selection-active"] if self.editing_mode == EditingMode.SELECTION else self.render_cache["selection-passive"], (1500, 360))
-        # object_text = self.font.render("Objects", True, active_color if self.editing_mode == EditingMode.OBJECTS else passive_color, 0)
         wnd.display.blit(self.render_cache["objects-active"] if self.editing_mode == EditingMode.OBJECTS else self.render_cache["objects-passive"], (1500, 380))
         pygame.draw.line(wnd.display, passive_color, (1500, 396), (1580, 396))
-        # collision_text = self.font.render("Simulation", True, active_color if self.editing_mode == EditingMode.SIMULATION else passive_color, 0)
         wnd.display.blit(self.render_cache["simulation-active"] if self.editing_mode == EditingMode.SIMULATION else self.render_cache["simulation-passive"], (1500, 400))
-        # collision_text = self.font.render("Frame-by-frame", True, active_color if self.editing_mode == EditingMode.FRAMEBYFRAME else passive_color, 0)
         wnd.display.blit(self.render_cache["framebyframe-active"] if self.editing_mode == EditingMode.FRAMEBYFRAME else self.render_cache["framebyframe-passive"], (1500, 420))
 
         fps = self.main_loop.fps()
@@ -331,25 +337,25 @@ class Editor:
                     w = (self.sm_selection_2[0] - self.sm_selection_1[0] + 1) * Tileset.TILE_W
                     h = (self.sm_selection_2[1] - self.sm_selection_1[1] + 1) * Tileset.TILE_H
                     pygame.draw.rect(self.screen_seg.display, (255, 0, 0), pygame.Rect(self.sm_selection_1[0] * Tileset.TILE_W, self.sm_selection_1[1] * Tileset.TILE_H, w, h), 1)
-                render_collisions_text = self.font.render("[Render as collisions]", True, active_color if self.sm_render_collisions else passive_color, 0)
-                wnd.display.blit(render_collisions_text, (Editor.ts_display_x, Editor.ts_display_y))
+                wnd.display.blit(self.render_cache["rac-active"] if self.sm_render_collisions else self.render_cache["rac-passive"], (Editor.ts_display_x, Editor.ts_display_y))
                 has_selection = self.sm_selection_1 is not None and self.sm_selection_2 is not None
-                # cut_text = self.font.render("[Cut] (X)", True, active_color if has_selection else passive_color, 0)
                 wnd.display.blit(self.render_cache["sel-cut-active"] if has_selection else self.render_cache["sel-cut-passive"], (Editor.ts_display_x, Editor.ts_display_y + 20))
-                # copy_text = self.font.render("[Copy] (C)", True, active_color if has_selection else passive_color, 0)
                 wnd.display.blit(self.render_cache["sel-copy-active"] if has_selection else self.render_cache["sel-copy-passive"], (Editor.ts_display_x, Editor.ts_display_y + 40))
-                # fill_t_text = self.font.render("[Fill with terrain] (I)", True, active_color if has_selection else passive_color, 0)
                 wnd.display.blit(self.render_cache["sel-fillt-active"] if has_selection else self.render_cache["sel-fillt-passive"], (Editor.ts_display_x, Editor.ts_display_y + 60))
                 wnd.display.blit(self.tileset.image_surface, (Editor.ts_display_x - 20, Editor.ts_display_y + 58), pygame.Rect(self.ts_select_x * Tileset.TILE_W, self.ts_select_y * Tileset.TILE_H, Tileset.TILE_W, Tileset.TILE_H))
-                # fill_c_text = self.font.render("[Fill with collision] (O)", True, active_color if has_selection else passive_color, 0)
                 wnd.display.blit(self.render_cache["sel-fillc-active"] if has_selection else self.render_cache["sel-fillc-passive"], (Editor.ts_display_x, Editor.ts_display_y + 80))
                 Screen.collision_overlays[self.collision_editor](wnd.display, Editor.ts_display_x - 20, Editor.ts_display_y + 78)
-                # reset_t_text = self.font.render("[Reset terrain]", True, active_color if has_selection else passive_color, 0)
                 wnd.display.blit(self.render_cache["sel-resett-active"] if has_selection else self.render_cache["sel-resett-passive"], (Editor.ts_display_x, Editor.ts_display_y + 100))
-                # reset_c_text = self.font.render("[Reset collision]", True, active_color if has_selection else passive_color, 0)
                 wnd.display.blit(self.render_cache["sel-resetc-active"] if has_selection else self.render_cache["sel-resetc-passive"], (Editor.ts_display_x, Editor.ts_display_y + 120))
-                # paste_text = self.font.render("[Paste] (V)", True, active_color if self.sm_clipboard is not None else passive_color, 0)
                 wnd.display.blit(self.render_cache["sel-paste-active"] if self.sm_clipboard is not None else self.render_cache["sel-paste-passive"], (Editor.ts_display_x, Editor.ts_display_y + 140))
+            elif self.editing_mode == EditingMode.OBJECTS:
+                if self.objed_selection is None:
+                    no_way_text = self.font.render("No placable objects exist.", True, (255, 0, 0), 0)
+                    wnd.display.blit(no_way_text, (Editor.ts_display_x, Editor.ts_display_y))
+                else:
+                    object_name_text = self.font.render("Creating new: {0}".format(self.objed_selection.object_name), True, (255, 255, 255), 0)
+                    wnd.display.blit(object_name_text, (Editor.ts_display_x, Editor.ts_display_y))
+                    self.objed_selection.render_editor_properties(wnd.display, self.font, Editor.ts_display_x, Editor.ts_display_y + 40, self.render_cache)
             if self.edited_world.starting_screen_id == self.edited_screen.screen_id:
                 self.controller.player.x = self.edited_world.start_x
                 self.controller.player.y = self.edited_world.start_y
@@ -360,10 +366,10 @@ class Editor:
 
             scr_id_text = self.font.render("Screen id: {0}".format(self.edited_screen.screen_id), True, (255, 255, 255), 0)
             wnd.display.blit(scr_id_text, (1080, 320))
-            dec_text = self.font.render("[-]", True, (255, 255, 255), 0)
-            inc_text = self.font.render("[+]", True, (255, 255, 255), 0)
             e_tr = self.edited_screen.transitions[0]
             e_tr_text = self.font.render("East transition: {0}".format("solid" if e_tr == 0 else e_tr), True, (255, 255, 255), 0)
+            dec_text = self.render_cache["dec"]
+            inc_text = self.render_cache["inc"]
             wnd.display.blit(e_tr_text, (1080, 340))
             wnd.display.blit(dec_text, (1270, 340))
             wnd.display.blit(inc_text, (1290, 340))
@@ -421,8 +427,7 @@ class Editor:
         else:
             if self.editing_mode == EditingMode.SIMULATION or self.editing_mode == EditingMode.FRAMEBYFRAME:
                 self.controller.render_elements(self.screen_seg)
-                render_collisions_text = self.font.render("[Render as collisions]", True, active_color if self.controller.render_collisions else passive_color, 0)
-                wnd.display.blit(render_collisions_text, (Editor.ts_display_x, Editor.ts_display_y))
+                wnd.display.blit(self.render_cache["rac-active"] if self.controller.render_collisions else self.render_cache["rac-passive"], (Editor.ts_display_x, Editor.ts_display_y))
 
     def sm_to_clipboard(self):
         self.sm_clipboard = [[(0, 0, 0) for x in range(self.sm_selection_1[0], self.sm_selection_2[0] + 1)] for y in range(self.sm_selection_1[1], self.sm_selection_2[1] + 1)]

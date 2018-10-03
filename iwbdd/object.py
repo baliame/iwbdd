@@ -12,6 +12,13 @@ def generate_rectangle_hitbox(w, h):
 class EPType(Enum):
     IntSelector = 1    # Arguments: default, min, max, step
     PointSelector = 2  # Arguments: -
+    FloatSelector = 3    # Arguments: default, min, max, step
+
+
+class SurfaceWrapper:
+    def __init__(self, w, h):
+        self.display = pygame.Surface((w, h), SRCALPHA)
+        self.display.fill((0, 0, 0, 0))
 
 
 # Object state
@@ -24,6 +31,7 @@ class Object:
     exclude_from_object_editor = False
     object_editor_items = None
     no_properties_text = None
+    object_name = ""
 
     @staticmethod
     def enumerate_objects(base_class):
@@ -34,7 +42,7 @@ class Object:
                 Object.object_editor_items.append(item)
                 Object.enumerate_objects(item)
 
-    def __init__(self, screen, x=0, y=0):
+    def __init__(self, screen, x=0, y=0, init_dict=None):
         self.screen = screen
         self.x = x
         self.y = y
@@ -55,6 +63,10 @@ class Object:
         self.hbds_dirty = True
         self.hitbox_draw_surface = None
         self.hitbox_draw_surface_color = None
+
+        if init_dict is not None:
+            for dest_var, init_val in init_dict.items():
+                setattr(self, dest_var, init_val)
 
     @property
     def offset_x(self):
@@ -114,6 +126,9 @@ class Object:
             else:
                 self.spritesheet.draw_cell_to(wnd.display, state[1][0], state[1][1], draw_x, draw_y)
 
+    def object_editor_draw(self, wnd):
+        self.draw(self, wnd)
+
     def draw_as_hitbox(self, wnd, color):
         ix = int(self.x)
         iy = int(self.y)
@@ -141,16 +156,46 @@ class Object:
             dest = (ix + self._offset_x, iy + self._offset_y)
         wnd.display.blit(self.hitbox_draw_surface, dest)
 
+    def tick(self):
+        pass
+
     @classmethod
     def render_editor_properties(cls, surf, font, x, y, render_cache):
         if cls.exclude_from_object_editor:
             raise TypeError('{0} is a hidden object, should not be available in editor.'.format(cls))
         if len(cls.editor_properties) == 0:
             if Object.no_properties_text is None:
-                Object.no_properties_text = font.render("This object has configurable attributes.", True, (255, 255, 255), 0)
-            surf.blit(Object.no_properties_text, x, y)
+                Object.no_properties_text = font.render("This object has no configurable attributes.", True, (255, 255, 255), 0)
+            surf.blit(Object.no_properties_text, (x, y))
             return
-        for dest_var, spec in cls.editor_properties:
+        cy = y
+        for dest_var, spec in cls.editor_properties.items():
+            dv_render = "obj-dv-{0}".format(dest_var)
+            if dv_render not in render_cache:
+                render_cache[dv_render] = font.render(dest_var, True, (255, 255, 255))
+            surf.blit(render_cache[dv_render], (x, cy))
             if spec[0] == EPType.IntSelector:
                 if dest_var not in cls.editing_values:
                     cls.editing_values[dest_var] = spec[1]
+                value_text = font.render("{0}".format(cls.editing_values[dest_var]), True, (255, 255, 255), 0)
+                surf.blit(value_text, (x + 200, cy))
+                surf.blit(render_cache["inc"], (x + 300, cy))
+                surf.blit(render_cache["dec"], (x + 320, cy))
+            elif spec[0] == EPType.PointSelector:
+                if dest_var not in cls.editing_values:
+                    cls.editing_values[dest_var] = (0, 0)
+                value_text = font.render("({0}, {1})".format(cls.editing_values[dest_var][0], cls.editing_values[dest_var][1]), True, (255, 255, 255), 0)
+                surf.blit(value_text, (x + 200, cy))
+                surf.blit(render_cache["selectpt"], (x + 300, cy))
+            elif spec[0] == EPType.FloatSelector:
+                if dest_var not in cls.editing_values:
+                    cls.editing_values[dest_var] = spec[1]
+                value_text = font.render("{0:.4f}".format(cls.editing_values[dest_var]), True, (255, 255, 255), 0)
+                surf.blit(value_text, (x + 200, cy))
+                surf.blit(render_cache["inc"], (x + 300, cy))
+                surf.blit(render_cache["dec"], (x + 320, cy))
+            cy += 20
+
+    @classmethod
+    def check_object_editor_click(cls):
+        pass

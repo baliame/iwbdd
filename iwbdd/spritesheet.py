@@ -17,6 +17,7 @@ def read_spritesheets(source):
         for i in range(tileset_cnt):
             t = Spritesheet(f)
             Spritesheet.spritesheets[t.spritesheet_id] = t
+            Spritesheet.spritesheets_byname[t.spritesheet_name] = t
 
 
 def pack_spritesheets_from_files(files, dest):
@@ -32,6 +33,8 @@ def pack_spritesheets_from_files(files, dest):
                 print("Filename must be SHEETNAME-WIDTH-HEIGHT.{0}".format('.'.join(fn.split('.')[1:])))
                 raise
             d.write(struct.pack('<L', ss_id))
+            d.write(struct.pack('<L', len(fn)))
+            d.write(fn.encode('ascii', 'replace'))
             d.write(struct.pack('<L', w))
             d.write(struct.pack('<L', h))
             with open(files[ss_id], 'rb') as f:
@@ -42,6 +45,7 @@ def pack_spritesheets_from_files(files, dest):
 
 class Spritesheet:
     spritesheets = {}
+    spritesheets_byname = {}
 
     @staticmethod
     def find(tid):
@@ -51,6 +55,7 @@ class Spritesheet:
 
     def __init__(self, reader=None):
         self.spritesheet_id = 0
+        self.spritesheet_name = ""
         self.image_surface = None
         self.image_surface_colored = None
         self.cell_w = 0
@@ -62,6 +67,8 @@ class Spritesheet:
 
     def read_spritesheet_data(self, reader):
         self.spritesheet_id = struct.unpack('<L', eofc_read(reader, 4))[0]
+        spritesheet_name_len = struct.unpack('<L', eofc_read(reader, 4))[0]
+        self.spritesheet_name = eofc_read(reader, spritesheet_name_len)
         self.cell_w = struct.unpack('<L', eofc_read(reader, 4))[0]
         self.cell_h = struct.unpack('<L', eofc_read(reader, 4))[0]
         data_len = struct.unpack('<L', eofc_read(reader, 4))[0]

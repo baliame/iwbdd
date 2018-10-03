@@ -33,6 +33,7 @@ def editor():
         print("Missing argument: world file")
         sys.exit(2)
 
+    Object.enumerate_objects(Object)
     w = Window(1600, 768, "IWBDD Editor")
     m.set_window(w)
 
@@ -55,7 +56,6 @@ def editor_scaled():
         sys.exit(2)
 
     Object.enumerate_objects(Object)
-    print(Object.object_editor_items)
     w = Window(1200, 576, "IWBDD Editor")
     scaler = w.create_scaler(1600, 768)
     m.set_window(scaler)
