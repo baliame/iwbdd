@@ -33,8 +33,8 @@ class Tileset:
     draw_surface = None
     draw_surface_w = 0
     draw_surface_h = 0
-    TILE_W = 16
-    TILE_H = 16
+    TILE_W = 24
+    TILE_H = 24
 
     @staticmethod
     def find(tid):

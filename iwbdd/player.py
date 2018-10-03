@@ -7,10 +7,10 @@ class Player(Object):
 
     def __init__(self):
         super().__init__(None)
-        self.bottom_pixel = 9
-        self.hitbox = generate_rectangle_hitbox(8, self.bottom_pixel + 1)
-        self.offset_x = -4
-        self.offset_y = -6
+        self.bottom_pixel = 14
+        self.hitbox = generate_rectangle_hitbox(12, self.bottom_pixel + 1)
+        self.offset_x = -6
+        self.offset_y = -9
         # self.hb_bg_w = 16
         # self.hb_bg_h = 16
         self.spritesheet = Spritesheet.spritesheets[1]

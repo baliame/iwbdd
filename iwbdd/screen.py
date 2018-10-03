@@ -58,9 +58,9 @@ COLLISIONTEST_COLORS = {
 
 
 class Screen:
-    SCREEN_W = 64
-    SCREEN_H = 48
-    SCREEN_SIZE_W = 1024
+    SCREEN_W = 42
+    SCREEN_H = 32
+    SCREEN_SIZE_W = 1008
     SCREEN_SIZE_H = 768
 
     collision_overlays = {

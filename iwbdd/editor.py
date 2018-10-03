@@ -36,8 +36,8 @@ SimulationModes = (EditingMode.SIMULATION, EditingMode.FRAMEBYFRAME)
 
 class Editor:
     instance = None
-    ts_view_w = 30
-    ts_view_h = 15
+    ts_view_w = 20
+    ts_view_h = 10
 
     ts_display_x = 1080
     ts_display_y = 32
@@ -163,7 +163,7 @@ class Editor:
             3: False,
         }
         self.collision_editor = 0
-        self.screen_seg = main_loop.segment_window(0, 0, 1024, 768)
+        self.screen_seg = main_loop.segment_window(0, 0, Screen.SCREEN_SIZE_W, Screen.SCREEN_SIZE_H)
 
         self.sm_selection_1 = None
         self.sm_selection_2 = None
@@ -198,6 +198,7 @@ class Editor:
 
             if first_sid == -1:
                 self.create_new_screen()
+                self.edited_world.starting_screen_id = list(self.edited_world.screens)[0]
                 self.apply_background()
             else:
                 self.edited_screen = self.edited_world.screens[first_sid]
@@ -214,6 +215,7 @@ class Editor:
             self.screens = []
             self.apply_tileset()
             self.create_new_screen()
+            self.edited_world.starting_screen_id = list(self.edited_world.screens)[0]
             self.apply_background()
 
         self.controller = Controller(main_loop)
@@ -292,6 +294,9 @@ class Editor:
         pygame.draw.line(wnd.display, passive_color, (1500, 396), (1580, 396))
         wnd.display.blit(self.render_cache["simulation-active"] if self.editing_mode == EditingMode.SIMULATION else self.render_cache["simulation-passive"], (1500, 400))
         wnd.display.blit(self.render_cache["framebyframe-active"] if self.editing_mode == EditingMode.FRAMEBYFRAME else self.render_cache["framebyframe-passive"], (1500, 420))
+
+        save_now_text = self.font.render("[Save now]", True, active_color, 0)
+        wnd.display.blit(save_now_text, (1500, 728))
 
         fps = self.main_loop.fps()
         fpst = "{0}-fps".format(fps)
@@ -554,7 +559,7 @@ class Editor:
             if self.point_selection_callback is not None and event.button == 3:
                 self.point_selection_callback = None
                 return
-            if event.pos[0] >= 1024 and event.button == 1:
+            if event.pos[0] >= Screen.SCREEN_SIZE_W and event.button == 1:
                 if self.editing_mode == EditingMode.TERRAIN:
                     if mousebox(event.pos[0], event.pos[1], Editor.ts_display_x, Editor.ts_display_y, Editor.ts_view_w * Tileset.TILE_W, Editor.ts_view_h * Tileset.TILE_H):
                         tx = int((event.pos[0] - Editor.ts_display_x) / Tileset.TILE_W) + self.ts_view_x
@@ -603,7 +608,10 @@ class Editor:
                                 self.sm_paste()
 
                 if not self.locked[1]:
-                    if mousebox(event.pos[0], event.pos[1], 1080, 520, 100, 20):
+                    if mousebox(event.pos[0], event.pos[1], 1500, 728, 100, 20):
+                        self.locked[1] = True
+                        self.atexit(self.main_loop)
+                    elif mousebox(event.pos[0], event.pos[1], 1080, 520, 100, 20):
                         self.locked[1] = True
                         self.edited_world.starting_screen_id = self.edited_screen.screen_id
                     elif mousebox(event.pos[0], event.pos[1], 1270, 340, 40, 80):
@@ -660,7 +668,7 @@ class Editor:
                     elif self.edited_world.starting_screen_id == self.edited_screen.screen_id and mousebox(event.pos[0], event.pos[1], 1080, 540, 180, 20):
                         self.locked[1] = True
                         self.point_selection_callback = self.set_start_coordinates
-            elif event.pos[0] < 1024:
+            elif event.pos[0] < Screen.SCREEN_SIZE_W:
                 if self.point_selection_callback is not None and event.button == 1:
                     self.point_selection_callback(event.pos[0], event.pos[1])
                     self.point_selection_callback = None
@@ -760,7 +768,7 @@ class Editor:
 
     def mousemotion(self, event, ml):
         if event.buttons[0]:
-            if event.pos[0] < 1024 and self.editing_mode == EditingMode.SELECTION and not self.sm_holding:
+            if event.pos[0] < Screen.SCREEN_SIZE_W and self.editing_mode == EditingMode.SELECTION and not self.sm_holding:
                 return
             self.mousedown(_mousetev(event.pos, 1), ml)
         if event.buttons[2]:
