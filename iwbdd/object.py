@@ -3,10 +3,11 @@ from pygame.locals import SRCALPHA
 import pygame
 from .screen import CollisionTest
 from enum import Enum
+import numpy as np
 
 
 def generate_rectangle_hitbox(w, h):
-    return [[1 for x in range(w)] for y in range(h)]
+    return np.array([[1 for y in range(h)] for x in range(w)])
 
 
 class EPType(Enum):
@@ -135,8 +136,8 @@ class Object:
         if self.hitbox is None:
             return
         if self.hbds_dirty or self.hitbox_draw_surface is None or color != self.hitbox_draw_surface_color:
-            h = len(self.hitbox)
-            w = len(self.hitbox[0])
+            w = len(self.hitbox)
+            h = len(self.hitbox[0])
             self.hitbox_draw_surface = pygame.Surface((w if w > self.hb_bg_w else self.hb_bg_w, h if h > self.hb_bg_h else self.hb_bg_h), SRCALPHA)
             self.hitbox_draw_surface_color = color
             self.hbds_dirty = False
@@ -145,7 +146,7 @@ class Object:
                 hdpa[:] = fill
                 for yo in range(h):
                     for xo in range(w):
-                        if self.hitbox[yo][xo]:
+                        if self.hitbox[xo, yo]:
                             if self.hb_bg_w == 0 or self.hb_bg_h == 0:
                                 hdpa[xo, yo] = (color[0], color[1], color[2], 255)
                             else:

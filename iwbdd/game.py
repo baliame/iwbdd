@@ -18,20 +18,44 @@ class Controls(IntEnum):
     RIGHT = 1
     JUMP = 2
     SHOOT = 3
+    RESET = 4
+
+
+# 4 tiles = 96 px
+# 1 jump ~ 2 tiles
+# full 2 jumps ~ 4.1 tiles
+# v0 = ?, vt = 0
+# g = 0.2
+# v0 = -0.2 * t
+# s = 50
+# v0 * t + g/2 * t^2 = -50
+# -0.2t^2 + 0.1t^2 = -50
+# -0.1t^2 = -50
+# t^2 = 500
+# t = 22.36f
+# v0 = 0.2*22.36 = 4.47
+
+def sgnor0(v):
+    if v == 0:
+        return 0
+    return -1 if v < 0 else 1
 
 
 class Controller:
     instance = None
     # terminal_velocity = 4.4
-    terminal_velocity = 3.3
+    # terminal_velocity = 3.3
+    terminal_velocity = 7.47
+    jump_velocity = -7.2
     doublejump_strength = 0.8
     default_keybindings = {
         Controls.LEFT: pygame.K_LEFT,
         Controls.RIGHT: pygame.K_RIGHT,
         Controls.JUMP: pygame.K_SPACE,
         Controls.SHOOT: pygame.K_a,
+        Controls.RESET: pygame.K_r,
     }
-    movement_speed = 1.5
+    movement_speed = 2
 
     def __init__(self, main_loop):
         if Controller.instance is not None:
@@ -42,11 +66,15 @@ class Controller:
         self.current_world = None
         self.current_screen = None
         self.keybindings = Controller.default_keybindings.copy()
+        self.keybindings_lookup = {}
+        for ctrl in list(self.keybindings):
+            self.keybindings_lookup[self.keybindings[ctrl]] = ctrl
         self.suspended = False
         self.render_collisions = False
 
         self.player = None
         main_loop.add_ticker(self)
+        self.ml = main_loop
 
     def add_loaded_world(self, world):
         self.worlds.append(world)
@@ -93,6 +121,16 @@ class Controller:
 
     def start_from_editor(self, editor):
         self.suspended = False
+
+    # TODO: Save states
+    def reset_to_save(self):
+        self.player.reset()
+        self.current_screen.objects.remove(self.player)
+        self.current_screen = self.current_world.screens[self.current_world.starting_screen_id]
+        self.player.screen = self.current_screen
+        self.player.x = self.current_world.start_x
+        self.player.y = self.current_world.start_y
+        self.current_screen.objects.append(self.player)
 
     def transition(self, id):
         self.current_screen.objects.remove(self.player)
@@ -222,8 +260,8 @@ class Controller:
                 if jump_available:
                     # gv[0] += tgvrx * -gx
                     # gv[1] += tgvry * -gy
-                    gv[0] += -gx * self.current_screen.jump_frames
-                    gv[1] += -gy * self.current_screen.jump_frames
+                    gv[0] += Controller.jump_velocity * sgnor0(gx)
+                    gv[1] += Controller.jump_velocity * sgnor0(gy)
                     self.player.jumping = True
                 elif self.player.doublejump_available > 0 and not prevent_doublejump:
                     if gx:
@@ -234,8 +272,8 @@ class Controller:
                             gv[1] = 0
                     # gv[0] += tgvrx * -gx * Controller.doublejump_strength
                     # gv[1] += tgvry * -gy * Controller.doublejump_strength
-                    gv[0] += -gx * self.current_screen.jump_frames * Controller.doublejump_strength
-                    gv[1] += -gy * self.current_screen.jump_frames * Controller.doublejump_strength
+                    gv[0] += Controller.jump_velocity * sgnor0(gx) * Controller.doublejump_strength
+                    gv[1] += Controller.jump_velocity * sgnor0(gy) * Controller.doublejump_strength
                     self.player.jumping = True
                     self.player.doublejump_available -= 1
         else:
@@ -382,6 +420,18 @@ class Controller:
                 self.current_screen.render_objects(wnd)
             else:
                 self.current_screen.render_objects_hitboxes(wnd)
+
+    def keydown_handler(self, event, ml):
+        if event.key in self.keybindings_lookup:
+            ctrl = self.keybindings_lookup[event.key]
+            if ctrl == Controls.RESET:
+                self.reset_to_save()
+
+    def use_as_main_renderer(self):
+        self.ml.add_render_callback(Controller.render_elements_callback)
+
+    def use_as_main_keyhandler(self):
+        self.ml.set_blanket_keydown_handler(self.keydown_handler)
 
     def __call__(self, ml):
         self.simulate()

@@ -19,6 +19,7 @@ class MainLoop:
         self.renderers = []
         self.atexit = []
         self.keydown_handlers = {}
+        self.blanket_keydown_handler = None
         self.mouse_button_handler = None
         self.mouse_button_up_handler = None
         self.mouse_motion_handler = None
@@ -52,7 +53,6 @@ class MainLoop:
         if not self.was_init:
             raise RuntimeError("Quit before initialization.")
         pygame.quit()
-        quit()
 
     def set_window(self, w):
         if self.window is not None:
@@ -80,6 +80,9 @@ class MainLoop:
     def set_keydown_handler(self, key, cb):
         self.keydown_handlers[key] = cb
 
+    def set_blanket_keydown_handler(self, cb):
+        self.blanket_keydown_handler = cb
+
     def set_mouse_button_handler(self, cb):
         self.mouse_button_handler = cb
 
@@ -99,6 +102,8 @@ class MainLoop:
                 if event.type == QUIT:
                     self.break_main_loop()
                 elif event.type == KEYDOWN:
+                    if self.blanket_keydown_handler is not None:
+                        self.blanket_keydown_handler(event, self)
                     if event.key in self.keydown_handlers:
                         self.keydown_handlers[event.key](event, self)
                 elif event.type == MOUSEBUTTONDOWN and self.mouse_button_handler is not None:

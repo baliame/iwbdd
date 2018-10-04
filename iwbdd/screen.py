@@ -283,15 +283,15 @@ class Screen:
 
     # coll: (flags, solid count, solid min yo, solid max yo) [E, N, W, S, overlap]
     def test_screen_collision(self, x, y, hitbox):
-        h = len(hitbox)
-        w = len(hitbox[0])
+        w = len(hitbox)
+        h = len(hitbox[0])
         coll = [(0, 0, -1, -1), (0, 0, -1, -1), (0, 0, -1, -1), (0, 0, -1, -1), (0, 0, -1, -1)]
         cap = COLLISIONTEST_ALL_FLAGS
         with self.access_collision() as pixels:
             for yo in range(h):
                 cy = y + yo
                 for xo in range(w):
-                    if hitbox[yo][xo]:
+                    if hitbox[xo, yo]:
                         cx = x + xo
                         sat = 0
                         for cxo, cyo, idx in [(1, 0, 0), (0, -1, 1), (-1, 0, 2), (0, 1, 3), (0, 0, 4)]:

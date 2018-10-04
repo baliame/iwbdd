@@ -16,7 +16,8 @@ setup(
     ],
     packages=find_packages(),
     install_requires=[
-        "pygame"
+        "pygame",
+        "numpy"
     ],
     entry_points={
         'console_scripts': [
@@ -26,6 +27,7 @@ setup(
         ],
         'gui_scripts': [
             'iwbdd=iwbdd.iwbdd:main',
+            'iwbdd_prof=iwbdd.iwbdd:profiled',
             'iwbdd_editor=iwbdd.iwbdd:editor',
             'iwbdd_editor_scaled=iwbdd.iwbdd:editor_scaled'
         ],

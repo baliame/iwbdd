@@ -7,7 +7,9 @@ from .spritesheet import pack_spritesheets_from_files, read_spritesheets
 from .editor import Editor
 from .object import Object
 from . import object_importer
+from .game import Controller
 import sys
+import cProfile as profile
 
 
 def ml_exit_handler(event, ml):
@@ -17,13 +19,31 @@ def ml_exit_handler(event, ml):
 def main():
     m = MainLoop()
     m.init()
-
-    w = Window(1024, 768, "IWBDD")
+    w = Window(1008, 768, "IWBDD")
     m.set_window(w)
     m.set_keydown_handler(K_ESCAPE, ml_exit_handler)
+
+    read_tilesets("tilesets.tls")
+    read_backgrounds("backgrounds.bgs")
+    read_spritesheets("spritesheets.sss")
+
+    c = Controller(m)
+    c.load_world_from_file(sys.argv[1])
+    c.create_player()
+    c.use_as_main_renderer()
+    c.use_as_main_keyhandler()
+
     m.start()
 
     m.quit()
+
+
+def profiled():
+    pr = profile.Profile()
+    pr.enable()
+    pr.runcall(main)
+    # pr.dump_stats('prof.out')
+    pr.print_stats('cumulative')
 
 
 def editor():
