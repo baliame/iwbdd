@@ -4,6 +4,7 @@ from .screen import Screen, Collision, COLLISIONTEST_COLORS, CollisionTest
 from .world import World
 from .game import Controller
 from .object import Object
+from .common import mousebox
 from enum import IntEnum
 import pygame
 from pygame.locals import K_f, K_m, K_r, K_s, K_x, K_n, K_LEFT, K_RIGHT, K_UP, K_DOWN, K_PAGEUP, K_PAGEDOWN, K_DELETE, K_RETURN, K_BACKSPACE, K_c, K_v, K_o, K_i
@@ -13,10 +14,6 @@ class _mousetev:
     def __init__(self, pos, button):
         self.pos = pos
         self.button = button
-
-
-def mousebox(x, y, x0, y0, w, h):
-    return x >= x0 and y >= y0 and x < x0 + w and y < y0 + h
 
 
 class EditingMode(IntEnum):
@@ -106,6 +103,8 @@ class Editor:
         Collision.CONVEYOR_NORTH_SINGLE_SPEED: lambda wnd: pygame.draw.rect(wnd.display, COLLISIONTEST_COLORS[CollisionTest.CONVEYOR_NORTH_SINGLE_SPEED], pygame.Rect(Editor.tslx, Editor.tsty, 70, 70)) and pygame.draw.polygon(wnd.display, COLLISIONTEST_COLORS[CollisionTest.SOLID], [(Editor.tslx + 4, Editor.tsby - 4), (Editor.tshx1, Editor.tsty + 4), (Editor.tshx2, Editor.tsty + 4), (Editor.tsrx - 4, Editor.tsby - 4)]),
         Collision.CONVEYOR_WEST_SINGLE_SPEED: lambda wnd: pygame.draw.rect(wnd.display, COLLISIONTEST_COLORS[CollisionTest.CONVEYOR_WEST_SINGLE_SPEED], pygame.Rect(Editor.tslx, Editor.tsty, 70, 70)) and pygame.draw.polygon(wnd.display, COLLISIONTEST_COLORS[CollisionTest.SOLID], [(Editor.tsrx - 4, Editor.tsty + 4), (Editor.tslx + 4, Editor.tshy1), (Editor.tslx + 4, Editor.tshy2), (Editor.tsrx - 4, Editor.tsby - 4)]),
         Collision.CONVEYOR_SOUTH_SINGLE_SPEED: lambda wnd: pygame.draw.rect(wnd.display, COLLISIONTEST_COLORS[CollisionTest.CONVEYOR_SOUTH_SINGLE_SPEED], pygame.Rect(Editor.tslx, Editor.tsty, 70, 70)) and pygame.draw.polygon(wnd.display, COLLISIONTEST_COLORS[CollisionTest.SOLID], [(Editor.tslx + 4, Editor.tsty + 4), (Editor.tshx1, Editor.tsby - 4), (Editor.tshx2, Editor.tsby - 4), (Editor.tsrx - 4, Editor.tsty + 4)]),
+        Collision.SOLID_HALF_LEFT: lambda wnd: pygame.draw.rect(wnd.display, (0, 0, 255), pygame.Rect(Editor.tslx, Editor.tsty, 36, 70)),
+        Collision.SOLID_HALF_RIGHT: lambda wnd: pygame.draw.rect(wnd.display, (0, 0, 255), pygame.Rect(Editor.tshx1, Editor.tsty, 36, 70)),
     }
 
     def __init__(self, world_file, main_loop):
@@ -606,7 +605,10 @@ class Editor:
                         elif event.pos[1] < Editor.ts_display_y + 160:
                             if self.sm_clipboard is not None:
                                 self.sm_paste()
-
+                elif self.editing_mode == EditingMode.OBJECTS and not self.locked[1]:
+                    if self.objed_selection is not None and mousebox(event.pos[0], event.pos[1], Editor.ts_display_x, Editor.ts_display_y, 400, 240):
+                        if self.objed_selection.check_object_editor_click(self, event.pos[0], event.pos[1], Editor.ts_display_x, Editor.ts_display_y + 40):
+                            self.locked[1] = True
                 if not self.locked[1]:
                     if mousebox(event.pos[0], event.pos[1], 1500, 728, 100, 20):
                         self.locked[1] = True

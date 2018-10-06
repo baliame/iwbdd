@@ -4,6 +4,7 @@ import pygame
 from .background import Background
 from .tileset import Tileset
 from .common import eofc_read, is_reader_stream
+import copy
 
 
 class Collision(IntEnum):
@@ -26,6 +27,8 @@ class Collision(IntEnum):
     CONVEYOR_NORTH_SINGLE_SPEED = 16
     CONVEYOR_WEST_SINGLE_SPEED = 17
     CONVEYOR_SOUTH_SINGLE_SPEED = 18
+    SOLID_HALF_LEFT = 19
+    SOLID_HALF_RIGHT = 20
     COLLISION_TYPE_COUNT = auto()
 
 
@@ -41,6 +44,7 @@ class CollisionTest(IntEnum):
     CONVEYOR_NORTH_SINGLE_SPEED = 128
     CONVEYOR_WEST_SINGLE_SPEED = 256
     CONVEYOR_SOUTH_SINGLE_SPEED = 512
+    INTERACTABLE = 1024
 
 
 COLLISIONTEST_ALL_FLAGS = CollisionTest.SOLID | CollisionTest.DEADLY | CollisionTest.TRANSITION_EAST | CollisionTest.TRANSITION_NORTH | CollisionTest.TRANSITION_WEST | CollisionTest.TRANSITION_SOUTH
@@ -83,6 +87,8 @@ class Screen:
         Collision.CONVEYOR_NORTH_SINGLE_SPEED: lambda tgt, x, y: pygame.draw.rect(tgt, COLLISIONTEST_COLORS[CollisionTest.CONVEYOR_NORTH_SINGLE_SPEED], pygame.Rect(x, y, Tileset.TILE_W, Tileset.TILE_H)) and pygame.draw.polygon(tgt, COLLISIONTEST_COLORS[CollisionTest.SOLID], [(x + 2, y + Tileset.TILE_H - 3), (x + Tileset.TILE_W / 2 - 1, y + 2), (x + Tileset.TILE_W / 2, y + 2), (x + Tileset.TILE_W - 3, y + Tileset.TILE_H - 3)]),
         Collision.CONVEYOR_WEST_SINGLE_SPEED: lambda tgt, x, y: pygame.draw.rect(tgt, COLLISIONTEST_COLORS[CollisionTest.CONVEYOR_WEST_SINGLE_SPEED], pygame.Rect(x, y, Tileset.TILE_W, Tileset.TILE_H)) and pygame.draw.polygon(tgt, COLLISIONTEST_COLORS[CollisionTest.SOLID], [(x + Tileset.TILE_W - 3, y + 2), (x + 2, y + Tileset.TILE_H / 2 - 1), (x + 2, y + Tileset.TILE_H / 2), (x + Tileset.TILE_W - 3, y + Tileset.TILE_H - 3)]),
         Collision.CONVEYOR_SOUTH_SINGLE_SPEED: lambda tgt, x, y: pygame.draw.rect(tgt, COLLISIONTEST_COLORS[CollisionTest.CONVEYOR_SOUTH_SINGLE_SPEED], pygame.Rect(x, y, Tileset.TILE_W, Tileset.TILE_H)) and pygame.draw.polygon(tgt, COLLISIONTEST_COLORS[CollisionTest.SOLID], [(x + 2, y + 2), (x + Tileset.TILE_W / 2 - 1, y + Tileset.TILE_H - 3), (x + Tileset.TILE_W / 2, y + Tileset.TILE_H - 3), (x + Tileset.TILE_W - 3, y + 2)]),
+        Collision.SOLID_HALF_LEFT: lambda tgt, x, y: pygame.draw.rect(tgt, COLLISIONTEST_COLORS[CollisionTest.SOLID], pygame.Rect(x, y, Tileset.TILE_W / 2, Tileset.TILE_H)),
+        Collision.SOLID_HALF_RIGHT: lambda tgt, x, y: pygame.draw.rect(tgt, COLLISIONTEST_COLORS[CollisionTest.SOLID], pygame.Rect(x + Tileset.TILE_W / 2, y, Tileset.TILE_W / 2, Tileset.TILE_H)),
     }
 
     collision_test_flags = {
@@ -109,10 +115,16 @@ class Screen:
         self.flags = 0
         self.tiles = [[(0, 0, 0) for x in range(Screen.SCREEN_W)] for y in range(Screen.SCREEN_H)]
         self.objects = []
+        self.bound_objects = []
         self.gravity = (0, 0.15)
         self.jump_frames = 22
         if tile_data is not None:
             self.load_tile_data(tile_data)
+
+    def reset_to_inital_state(self):
+        self.objects = []
+        for obj in self.bound_objects:
+            self.objects.append(copy.copy(obj))
 
     def _read_header_v1(self, reader):
         scrid = struct.unpack("<L", eofc_read(reader, 4))[0]
@@ -149,6 +161,20 @@ class Screen:
         jump_frames = struct.unpack("<H", eofc_read(reader, 2))[0]
         return (scrid, tr_e, tr_n, tr_w, tr_s, background_id, flags, grav_x, grav_y, jump_frames)
 
+    def _read_header_v4(self, reader):
+        scrid = struct.unpack("<L", eofc_read(reader, 4))[0]
+        tr_e = struct.unpack("<L", eofc_read(reader, 4))[0]
+        tr_n = struct.unpack("<L", eofc_read(reader, 4))[0]
+        tr_w = struct.unpack("<L", eofc_read(reader, 4))[0]
+        tr_s = struct.unpack("<L", eofc_read(reader, 4))[0]
+        background_id = struct.unpack("<L", eofc_read(reader, 4))[0]
+        flags = struct.unpack("<L", eofc_read(reader, 4))[0]
+        grav_x = struct.unpack("<f", eofc_read(reader, 4))[0]
+        grav_y = struct.unpack("<f", eofc_read(reader, 4))[0]
+        jump_frames = struct.unpack("<H", eofc_read(reader, 2))[0]
+        object_count = struct.unpack("<H", eofc_read(reader, 2))[0]
+        return (scrid, tr_e, tr_n, tr_w, tr_s, background_id, flags, grav_x, grav_y, jump_frames, object_count)
+
     def _read_header(self, reader, legacy=False):
         if legacy:
             return self._read_header_v1(reader)
@@ -166,7 +192,7 @@ class Screen:
         return (ts_x, ts_y, collision)
 
     def _write_header(self, writer):
-        writer.write(struct.pack("<H", 3))
+        writer.write(struct.pack("<H", 4))
         writer.write(struct.pack("<L", self.screen_id))
         writer.write(struct.pack("<L", self.transitions[0]))
         writer.write(struct.pack("<L", self.transitions[1]))
@@ -177,6 +203,7 @@ class Screen:
         writer.write(struct.pack("<f", self.gravity[0]))
         writer.write(struct.pack("<f", self.gravity[1]))
         writer.write(struct.pack("<H", self.jump_frames))
+        writer.write(struct.pack("<H", len(self.bound_objects)))
 
     def _write_tile(self, writer, tile):
         writer.write(struct.pack("<H", tile[0]))
@@ -343,6 +370,20 @@ class Screen:
                 if sat == len(coll):
                     break
         return coll
+
+    def test_interactable_collision(self, ctrl, x, y, hitbox):
+        bbw = len(hitbox)
+        bbh = len(hitbox[0])
+        lx = x + bbw - 1
+        ly = y + bbh - 1
+        for obj in self.objects:
+            if obj.hitbox_type == Collision.INTERACTABLE:
+                obw = len(obj.hitbox)
+                obh = len(obj.hitbox[0])
+                olx = obj.x + obw
+                oly = obj.y + obh
+                if len(range(max(x, obj.x), min(lx, olx))) and len(range(max(y, obj.y), min(ly, oly))):
+                    obj.interact(ctrl)
 
     def render_collisions_to_window(self, wnd):
         win_w = wnd.display.get_width()

@@ -2,6 +2,7 @@ from .pygame_oo.main_loop import MainLoop
 from pygame.locals import SRCALPHA
 import pygame
 from .screen import CollisionTest
+from .common import mousebox
 from enum import Enum
 import numpy as np
 
@@ -33,6 +34,7 @@ class Object:
     object_editor_items = None
     no_properties_text = None
     object_name = ""
+    point_selection_var = None
 
     @staticmethod
     def enumerate_objects(base_class):
@@ -180,8 +182,8 @@ class Object:
                     cls.editing_values[dest_var] = spec[1]
                 value_text = font.render("{0}".format(cls.editing_values[dest_var]), True, (255, 255, 255), 0)
                 surf.blit(value_text, (x + 200, cy))
-                surf.blit(render_cache["inc"], (x + 300, cy))
-                surf.blit(render_cache["dec"], (x + 320, cy))
+                surf.blit(render_cache["dec"], (x + 300, cy))
+                surf.blit(render_cache["inc"], (x + 320, cy))
             elif spec[0] == EPType.PointSelector:
                 if dest_var not in cls.editing_values:
                     cls.editing_values[dest_var] = (0, 0)
@@ -193,10 +195,41 @@ class Object:
                     cls.editing_values[dest_var] = spec[1]
                 value_text = font.render("{0:.4f}".format(cls.editing_values[dest_var]), True, (255, 255, 255), 0)
                 surf.blit(value_text, (x + 200, cy))
-                surf.blit(render_cache["inc"], (x + 300, cy))
-                surf.blit(render_cache["dec"], (x + 320, cy))
+                surf.blit(render_cache["dec"], (x + 300, cy))
+                surf.blit(render_cache["inc"], (x + 320, cy))
             cy += 20
 
     @classmethod
-    def check_object_editor_click(cls):
+    def check_object_editor_click(cls, ed, x, y, base_x, base_y):
+        count = len(cls.editor_properties.items())
+        if count > 0:
+            if not mousebox(x, y, base_x + 300, base_y, 100, count * 20):
+                return False
+            cy = base_y + 20
+            for dest_var, spec in cls.editor_properties.items():
+                if y < cy:
+                    if spec[0] == EPType.IntSelector or spec[0] == EPType.FloatSelector:
+                        if x < base_x + 320:
+                            cls.editing_values[dest_var] -= spec[4]
+                        else:
+                            cls.editing_values[dest_var] += spec[4]
+                        if cls.editing_values[dest_var] < spec[2]:
+                            cls.editing_values[dest_var] = spec[2]
+                        elif cls.editing_values[dest_var] > spec[3]:
+                            cls.editing_values[dest_var] = spec[3]
+                    elif spec[0] == EPType.PointSelector:
+                        cls.point_selection_var = dest_var
+                        ed.point_selection_callback = cls.editor_point_selector
+                    return True
+                cy += 20
+            return False
+
+    @classmethod
+    def editor_point_selector(cls, x, y):
+        if cls.point_selection_var is None:
+            return
+        cls.editing_values[cls.point_selection_var] = (x, y)
+        cls.point_selection_var = None
+
+    def interact(self, ctrl):
         pass

@@ -45,8 +45,8 @@ class Controller:
     instance = None
     # terminal_velocity = 4.4
     # terminal_velocity = 3.3
-    terminal_velocity = 7.47
-    jump_velocity = -7.2
+    terminal_velocity = 6.47
+    jump_velocity = -6.2
     doublejump_strength = 0.8
     default_keybindings = {
         Controls.LEFT: pygame.K_LEFT,
@@ -255,7 +255,7 @@ class Controller:
             else:
                 change_facing = 1
         if keys[self.keybindings[Controls.JUMP]]:
-            if not self.player.jump_held:
+            if not self.player.jump_held and not self.player.doublejump_blocked:
                 self.player.jump_held = True
                 if jump_available:
                     # gv[0] += tgvrx * -gx
@@ -277,6 +277,8 @@ class Controller:
                     self.player.jumping = True
                     self.player.doublejump_available -= 1
         else:
+            if self.player.doublejump_blocked:
+                self.player.doublejump_blocked = False
             if self.player.jump_held:
                 self.player.jump_held = False
                 if self.player.jumping:

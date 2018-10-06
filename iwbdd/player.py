@@ -1,8 +1,8 @@
 from .object import Object, generate_rectangle_hitbox
 from .spritesheet import Spritesheet
 from .pygame_oo.main_loop import MainLoop
-import pygame
-import numpy as np
+# import pygame
+# import numpy as np
 
 
 class Player(Object):
@@ -20,6 +20,7 @@ class Player(Object):
         self.movement_velocity = [0, 0]
         self.gravity_velocity = [0, 0]
         self.doublejump_available = 1
+        self.doublejump_blocked = False
         self.hitboxes_cache = {}
         self.jump_held = False
         self.jumping = False
@@ -92,6 +93,7 @@ class Player(Object):
         self.jump_held = False
         self.jumping = False
         self.state = "stop_right"
+        self.doublejump_blocked = False
 
     @Object.state.setter
     def state(self, newstate):
