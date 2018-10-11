@@ -17,7 +17,7 @@ def read_spritesheets(source):
         for i in range(tileset_cnt):
             t = Spritesheet(f)
             Spritesheet.spritesheets[t.spritesheet_id] = t
-            Spritesheet.spritesheets_byname[t.spritesheet_name] = t
+            Spritesheet.spritesheets_byname[t.spritesheet_name.decode('ascii')] = t
 
 
 def pack_spritesheets_from_files(files, dest):

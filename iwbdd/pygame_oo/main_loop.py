@@ -31,6 +31,7 @@ class MainLoop:
         if self.was_init:
             raise RuntimeError("Duplicate initialization.")
 
+        pygame.mixer.pre_init(44100, -16, 2, 512)
         init = pygame.init()
         if init[1] > 0:
             raise RuntimeError("{0} pygame modules failed to initialize.".format(init[1]))

@@ -1,6 +1,10 @@
 from .world import World
 from .player import Player
-from .screen import CollisionTest, COLLISIONTEST_PREVENTS_MOVEMENT, COLLISIONTEST_PREVENTS_SIDE_GRAVITY, COLLISIONTEST_TRANSITIONS, Screen
+from .screen import COLLISIONTEST_PREVENTS_SIDE_GRAVITY, COLLISIONTEST_TRANSITIONS
+from .common import CollisionTest, COLLISIONTEST_PREVENTS_MOVEMENT, SCREEN_SIZE_W, SCREEN_SIZE_H
+from .object import Bullet
+from .audio_data import Audio
+from collections import defaultdict
 import pygame
 from enum import IntEnum
 
@@ -45,9 +49,10 @@ class Controller:
     instance = None
     # terminal_velocity = 4.4
     # terminal_velocity = 3.3
-    terminal_velocity = 6.47
+    terminal_velocity = 5
     jump_velocity = -6.2
     doublejump_strength = 0.8
+    firing_cooldown = 10
     default_keybindings = {
         Controls.LEFT: pygame.K_LEFT,
         Controls.RIGHT: pygame.K_RIGHT,
@@ -56,6 +61,7 @@ class Controller:
         Controls.RESET: pygame.K_r,
     }
     movement_speed = 2
+    default_music_volume = 0.8
 
     def __init__(self, main_loop):
         if Controller.instance is not None:
@@ -71,10 +77,24 @@ class Controller:
             self.keybindings_lookup[self.keybindings[ctrl]] = ctrl
         self.suspended = False
         self.render_collisions = False
+        self.saved_state = None
 
         self.player = None
+        self.source_bullet = None
+        self.trigger_group = defaultdict(int)
+        self.trigger_cache = defaultdict(int)
+        self.bossfight = None
         main_loop.add_ticker(self)
         self.ml = main_loop
+
+        self.music_volume = Controller.default_music_volume
+        pygame.mixer.set_num_channels(16)
+        pygame.mixer.set_reserved(3)
+        self.music_channel = pygame.mixer.Channel(0)
+        self.music_channel.set_volume(self.music_volume)
+        Audio.audio_by_name['quack.ogg'].sound.set_volume(0.1)
+        Audio.audio_by_name['quack2.ogg'].sound.set_volume(0.1)
+        self.boss_channels = [pygame.mixer.Channel(1), pygame.mixer.Channel(2)]
 
     def add_loaded_world(self, world):
         self.worlds.append(world)
@@ -84,7 +104,6 @@ class Controller:
             if self.player is not None:
                 self.player.x = self.current_world.start_x
                 self.player.y = self.current_world.start_y
-                self.current_screen.objects.append(self.player)
                 self.player.screen = self.current_screen
 
     def load_world_from_file(self, world):
@@ -96,61 +115,106 @@ class Controller:
             if self.player is not None:
                 self.player.x = self.current_world.start_x
                 self.player.y = self.current_world.start_y
-                self.current_screen.objects.append(self.player)
                 self.player.screen = self.current_screen
 
     def create_player(self):
         if self.player is None:
-            self.player = Player()
+            self.player = Player(self)
             if self.current_world is not None:
                 self.player.x = self.current_world.start_x
                 self.player.y = self.current_world.start_y
-                self.current_screen.objects.append(self.player)
             self.player.screen = self.current_screen
 
     def reset_from_editor(self, editor):
         self.player.reset()
-        self.current_screen.objects.remove(self.player)
         self.current_world = editor.edited_world
         self.current_screen = self.current_world.screens[self.current_world.starting_screen_id]
         self.player.screen = self.current_screen
         self.player.x = self.current_world.start_x
         self.player.y = self.current_world.start_y
-        self.current_screen.objects.append(self.player)
+        for idx in self.current_world.screens:
+            self.current_world.screens[idx].reset_to_initial_state()
+        self.trigger_group = defaultdict(int)
+        self.trigger_cache = defaultdict(int)
+        self.saved_state = None
         self.suspended = True
+        self.bossfight = None
+        self.music_channel.stop()
 
     def start_from_editor(self, editor):
         self.suspended = False
+        for idx in self.current_world.screens:
+            self.current_world.screens[idx].reset_to_initial_state()
+        if self.current_world.background_music is not None:
+            self.current_world.background_music.play(self.music_channel, loops=-1)
+
+    def save_state(self):
+        self.current_screen.save_state()
+        for transition in self.current_screen.transitions:
+            trd = []
+            if transition != 0 and transition not in trd:
+                self.current_world.screens[transition].save_state()
+                trd.append(transition)
+        self.player.create_save_state()
+        self.saved_state = {
+            "screen": self.current_screen.screen_id,
+            "trigger_group": self.trigger_group.copy()
+        }
 
     # TODO: Save states
     def reset_to_save(self):
-        self.player.reset()
-        self.current_screen.objects.remove(self.player)
-        self.current_screen = self.current_world.screens[self.current_world.starting_screen_id]
-        self.player.screen = self.current_screen
-        self.player.x = self.current_world.start_x
-        self.player.y = self.current_world.start_y
-        self.current_screen.objects.append(self.player)
+        self.trigger_cache = defaultdict(int)
+        if self.saved_state is None:
+            self.current_screen = self.current_world.screens[self.current_world.starting_screen_id]
+            self.player.reset()
+            self.player.screen = self.current_screen
+            self.player.x = self.current_world.start_x
+            self.player.y = self.current_world.start_y
+            self.trigger_group = defaultdict(int)
+            self.bossfight = None
+        else:
+            self.player.reset_to_saved_state()
+            self.current_screen = self.current_world.screens[self.saved_state["screen"]]
+            self.trigger_group = self.saved_state["trigger_group"].copy()
+            self.player.screen = self.current_screen
+            self.bossfight = None
+        for idx in self.current_world.screens:
+            if idx == self.current_screen.screen_id or idx in self.current_screen.transitions:
+                self.current_world.screens[idx].reset_to_saved_state()
+            else:
+                self.current_world.screens[idx].reset_to_initial_state()
 
     def transition(self, id):
-        self.current_screen.objects.remove(self.player)
         self.current_screen = self.current_world.screens[self.current_screen.transitions[id]]
         if id == 0:
             self.player.x = 0
         elif id == 1:
-            self.player.y = Screen.SCREEN_SIZE_H - len(self.player.hitbox)
+            self.player.y = SCREEN_SIZE_H - len(self.player.hitbox[0])
         elif id == 2:
-            self.player.x = Screen.SCREEN_SIZE_W - len(self.player.hitbox[0])
+            self.player.x = SCREEN_SIZE_W - len(self.player.hitbox)
         elif id == 3:
             self.player.y = 0
-        self.current_screen.objects.append(self.player)
+        self.player.screen = self.current_screen
+        self.player.destroy_bullets()
 
     def simulate(self):
         if self.suspended:
             return
         if self.player.dead:
             return
+        keys = pygame.key.get_pressed()
         self.current_screen.generate_object_collisions()
+        if self.player.prevent_shooting != 0:
+            if self.player.prevent_shooting > 0:
+                self.player.prevent_shooting -= 1
+            else:
+                if self.player.prevent_shooting > -Controller.firing_cooldown:
+                    self.player.prevent_shooting -= 1
+                if not keys[self.keybindings[Controls.SHOOT]]:
+                    self.player.prevent_shooting = Controller.firing_cooldown + self.player.prevent_shooting
+        elif keys[self.keybindings[Controls.SHOOT]]:
+            self.player.prevent_shooting = -1
+            self.player.fire()
         # print("==== Running simulation for frame")
         if self.player.cached_collision is None:
             self.player.cached_collision = self.current_screen.test_screen_collision(int(self.player.x), int(self.player.y), self.player.hitbox)
@@ -207,7 +271,8 @@ class Controller:
             prevent_doublejump = True
             self.player.jumping = False
         else:
-            gv = [bound(gv[0] + gx, -tv, tv), bound(gv[1] + gy, -tv, tv)]
+            gv = [bound(gv[0] + gx, -tv if gx < 0 else -2 * tv, tv if gx > 0 else 2 * tv), bound(gv[1] + gy, -tv if gy < 0 else -2 * tv, tv if gy > 0 else 2 * tv)]
+            # gv = [bound(gv[0] + gx, -tv, tv), bound(gv[1] + gy, -tv, tv)]
             if gv[0] != 0:
                 if gv[0] < 0:
                     cancel_dirs.append(2)
@@ -244,7 +309,6 @@ class Controller:
         mvx = 0
         mvy = 0
         change_facing = 0
-        keys = pygame.key.get_pressed()
         if keys[self.keybindings[Controls.LEFT]]:
             mvx += -Controller.movement_speed
             change_facing = -1
@@ -263,6 +327,7 @@ class Controller:
                     gv[0] += Controller.jump_velocity * sgnor0(gx)
                     gv[1] += Controller.jump_velocity * sgnor0(gy)
                     self.player.jumping = True
+                    Audio.play_by_name("quack.ogg")
                 elif self.player.doublejump_available > 0 and not prevent_doublejump:
                     if gx:
                         if (gv[0] < 0 and gx < 0) or (gv[0] > 0 and gx > 0):
@@ -275,6 +340,7 @@ class Controller:
                     gv[0] += Controller.jump_velocity * sgnor0(gx) * Controller.doublejump_strength
                     gv[1] += Controller.jump_velocity * sgnor0(gy) * Controller.doublejump_strength
                     self.player.jumping = True
+                    Audio.play_by_name("quack.ogg")
                     self.player.doublejump_available -= 1
         else:
             if self.player.doublejump_blocked:
@@ -404,6 +470,7 @@ class Controller:
                 sloping = 0
             self.player.x = pt[0]
             self.player.y = pt[1]
+            self.current_screen.test_interactable_collision(self, pt[0], pt[1], self.player.hitbox)
         self.player.x = dest[0]
         self.player.y = dest[1]
         self.player.cached_collision = None
@@ -416,12 +483,13 @@ class Controller:
     def render_elements(self, wnd):
         if self.current_screen is not None:
             self.current_screen.render_to_window(wnd)
-            if self.render_collisions:
-                self.current_screen.render_collisions_to_window(wnd)
             if not self.render_collisions:
                 self.current_screen.render_objects(wnd)
+                self.player.draw(wnd)
             else:
+                self.current_screen.render_collisions_to_window(wnd)
                 self.current_screen.render_objects_hitboxes(wnd)
+                self.player.draw_as_hitbox(wnd, (0, 255, 0))
 
     def keydown_handler(self, event, ml):
         if event.key in self.keybindings_lookup:
@@ -436,4 +504,12 @@ class Controller:
         self.ml.set_blanket_keydown_handler(self.keydown_handler)
 
     def __call__(self, ml):
+        if not self.suspended:
+            self.trigger_cache = defaultdict(int)
+            self.current_screen.tick(self)
+            for transition in self.current_screen.transitions:
+                trd = []
+                if transition != 0 and transition not in trd:
+                    self.current_world.screens[transition].tick(self)
+                    trd.append(transition)
         self.simulate()

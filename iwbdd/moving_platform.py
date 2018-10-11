@@ -1,6 +1,6 @@
 from .object import Object, EPType, generate_rectangle_hitbox, SurfaceWrapper
 from .spritesheet import Spritesheet
-from .screen import CollisionTest
+from .common import CollisionTest
 from collections import OrderedDict
 import pygame
 
@@ -13,6 +13,7 @@ class MovingPlatform(Object):
         "speed": (EPType.FloatSelector, 0.0005, 0.0001, 1, 0.0001),
         "forward": (EPType.IntSelector, 1, 0, 1, 1),
     })
+    editor_frame_size = (48, 24)
 
     def __init__(self, screen, x=0, y=0, init_dict=None):
         self.dest_pos = (0, 0)
@@ -31,7 +32,7 @@ class MovingPlatform(Object):
         self.dy = 0
         self.objed_surf = None
 
-    def tick(self):
+    def tick(self, scr, ctrl):
         if self.forward:
             self.t += self.speed
             if self.t > 1:
@@ -48,6 +49,7 @@ class MovingPlatform(Object):
         self.dy = ny - self.y
         self.x = nx
         self.y = ny
+        scr.objects_dirty = True
 
     def object_editor_draw(self, wnd):
         if self.objed_surf is None:

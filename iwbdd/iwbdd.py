@@ -1,13 +1,17 @@
+import os
+from shutil import copyfile
 from .pygame_oo.window import Window
 from .pygame_oo.main_loop import MainLoop
 from pygame.locals import *
 from .tileset import pack_tilesets_from_files, read_tilesets
 from .background import pack_backgrounds_from_files, read_backgrounds
 from .spritesheet import pack_spritesheets_from_files, read_spritesheets
+from .audio_data import pack_audio_from_files, read_audio
 from .editor import Editor
 from .object import Object
 from . import object_importer
 from .game import Controller
+import time
 import sys
 import cProfile as profile
 
@@ -19,6 +23,7 @@ def ml_exit_handler(event, ml):
 def main():
     m = MainLoop()
     m.init()
+    Object.enumerate_objects(Object)
     w = Window(1008, 768, "IWBDD")
     m.set_window(w)
     m.set_keydown_handler(K_ESCAPE, ml_exit_handler)
@@ -26,6 +31,7 @@ def main():
     read_tilesets("tilesets.tls")
     read_backgrounds("backgrounds.bgs")
     read_spritesheets("spritesheets.sss")
+    read_audio("audio.dat")
 
     c = Controller(m)
     c.load_world_from_file(sys.argv[1])
@@ -60,6 +66,14 @@ def editor():
     read_tilesets("tilesets.tls")
     read_backgrounds("backgrounds.bgs")
     read_spritesheets("spritesheets.sss")
+    read_audio("audio.dat")
+
+    try:
+        os.mkdir("backups")
+    except FileExistsError:
+        pass
+
+    copyfile(sys.argv[1], "backups/{0}.{1}".format(sys.argv[1], time.strftime("%Y%m%d.%H%M%S")))
 
     ed = Editor(sys.argv[1], m)
     m.set_keydown_handler(K_ESCAPE, ml_exit_handler)
@@ -67,6 +81,29 @@ def editor():
 
     m.quit()
 
+def editor_w2():
+    m = MainLoop()
+    m.init()
+
+    Object.enumerate_objects(Object)
+    w = Window(1600, 768, "IWBDD Editor")
+    m.set_window(w)
+
+    read_tilesets("tilesets.tls")
+    read_backgrounds("backgrounds.bgs")
+    read_spritesheets("spritesheets.sss")
+    read_audio("audio.dat")
+
+    try:
+        os.mkdir("backups")
+    except FileExistsError:
+        pass
+
+    ed = Editor("world2.wld", m)
+    m.set_keydown_handler(K_ESCAPE, ml_exit_handler)
+    m.start()
+
+    m.quit()
 
 def editor_scaled():
     m = MainLoop()
@@ -83,6 +120,7 @@ def editor_scaled():
     read_tilesets("tilesets.tls")
     read_backgrounds("backgrounds.bgs")
     read_spritesheets("spritesheets.sss")
+    read_audio("audio.dat")
 
     ed = Editor(sys.argv[1], m)
     m.set_keydown_handler(K_ESCAPE, ml_exit_handler)
@@ -103,6 +141,8 @@ def world_tester():
 
     read_tilesets("tilesets.tls")
     read_backgrounds("backgrounds.bgs")
+    read_spritesheets("spritesheets.sss")
+    read_audio("audio.dat")
 
     m.set_keydown_handler(K_ESCAPE, ml_exit_handler)
     m.start()
@@ -126,6 +166,7 @@ def pack_tilesets():
         srcfiles[id_cntr] = elem
         id_cntr += 1
     pack_tilesets_from_files(srcfiles, destfile)
+    m.quit()
 
 
 def pack_backgrounds():
@@ -144,6 +185,7 @@ def pack_backgrounds():
         srcfiles[id_cntr] = elem
         id_cntr += 1
     pack_backgrounds_from_files(srcfiles, destfile)
+    m.quit()
 
 
 def pack_spritesheets():
@@ -162,3 +204,18 @@ def pack_spritesheets():
         srcfiles[id_cntr] = elem
         id_cntr += 1
     pack_spritesheets_from_files(srcfiles, destfile)
+    m.quit()
+
+
+def pack_audio():
+    m = MainLoop()
+    m.init()
+    if len(sys.argv) == 1:
+        print("Missing arguments: destination, source files")
+        sys.exit(2)
+    if len(sys.argv) == 2:
+        print("Missing arguments: source files")
+        sys.exit(2)
+    destfile = sys.argv[1]
+    pack_audio_from_files(sys.argv[2:], destfile)
+    m.quit()

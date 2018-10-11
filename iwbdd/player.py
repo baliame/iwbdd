@@ -1,14 +1,18 @@
-from .object import Object, generate_rectangle_hitbox
+from .object import Object, generate_rectangle_hitbox, Bullet
 from .spritesheet import Spritesheet
 from .pygame_oo.main_loop import MainLoop
+import copy
+from .audio_data import Audio
 # import pygame
 # import numpy as np
 
 
 class Player(Object):
     exclude_from_object_editor = True
+    saveable = False
+    max_bullets = 4
 
-    def __init__(self):
+    def __init__(self, ctrl):
         super().__init__(None)
         self.bottom_pixel = 0
         # self.hitbox = generate_rectangle_hitbox(12, self.bottom_pixel + 1)
@@ -21,6 +25,7 @@ class Player(Object):
         self.gravity_velocity = [0, 0]
         self.doublejump_available = 1
         self.doublejump_blocked = False
+        self.prevent_shooting = 0
         self.hitboxes_cache = {}
         self.jump_held = False
         self.jumping = False
@@ -36,8 +41,8 @@ class Player(Object):
         dja = Object(None, 0, 0)
         dja.spritesheet = Spritesheet.spritesheets[2]
         dja.hidden = True
-        dja.offset_x = self.offset_x
-        dja.offset_y = self.offset_y
+        dja.offset_x = -4
+        dja.offset_y = -16
         dja.states = {
             "2": (False, (0, 0)),
             "3": (False, (1, 0)),
@@ -52,6 +57,60 @@ class Player(Object):
         self.hitbox = self.hitboxes_cache[self.states[self._state][-1]][0]
         self.offset_x = self.hitboxes_cache[self.states[self._state][-1]][1]
         self.offset_y = self.hitboxes_cache[self.states[self._state][-1]][2]
+        self.bullets = []
+        self.controller = ctrl
+        self.save_state = None
+
+    def create_save_state(self):
+        self.save_state = Player(None)
+        self.save_state.movement_velocity = self.movement_velocity.copy()
+        self.save_state.gravity_velocity = [0, 0]
+        self.save_state.doublejump_available = 1 if self.doublejump_available <= 1 else self.doublejump_available
+        self.save_state._state = self._state
+        self.save_state.x = self.x
+        self.save_state.y = self.y
+
+    def reset_to_saved_state(self):
+        ss = self.save_state
+        self.reset()
+        if ss is not None:
+            self.movement_velocity = ss.movement_velocity.copy()
+            self.gravity_velocity = ss.gravity_velocity.copy()
+            self.doublejump_available = ss.doublejump_available
+            self.state = ss.state
+            self.x = ss.x
+            self.y = ss.y
+            self.save_state = ss
+
+    def reset(self):
+        self.movement_velocity = [0, 0]
+        self.gravity_velocity = [0, 0]
+        self.doublejump_available = 1
+        self.cached_collision = None
+        self.spritesheet.applied_color = None
+        self.dead = False
+        self.jump_held = False
+        self.jumping = False
+        self.state = "stop_right"
+        self.doublejump_blocked = False
+        self.prevent_shooting = 0
+        self.destroy_bullets()
+        self.save_state = None
+
+    def fire(self):
+        if len(self.bullets) >= Player.max_bullets:
+            return
+        facing = 1
+        if self._state in ("stop_left", "moving_left"):
+            facing = -1
+        b = Bullet(self.screen, self.x if facing < 0 else self.x + 12, self.y + 2, {"facing": facing, "player": self})
+        self.bullets.append(b)
+        self.screen.objects.append(b)
+        Audio.play_by_name("quack2.ogg")
+
+    def destroy_bullets(self):
+        for b in self.bullets.copy():
+            b.cleanup_self()
 
     def generate_hitboxes(self):
         hitbox_names = set()
@@ -59,9 +118,9 @@ class Player(Object):
             if definition[-1] not in hitbox_names:
                 hitbox_names.add(definition[-1])
         for hbname in hitbox_names:
-            hb = generate_rectangle_hitbox(16, 12)
-            self.hitboxes_cache[hbname] = (hb, -4, -12)
-            self.bottom_pixel = 11
+            hb = generate_rectangle_hitbox(16, 8)
+            self.hitboxes_cache[hbname] = (hb, -4, -16)
+            self.bottom_pixel = 7
             # if self.states[hbname][0]:
             #     tile_coord = self.states[hbname][2][0]
             # else:
@@ -82,18 +141,6 @@ class Player(Object):
             # h = len(hitbox[0])
             # if h - 1 > self.bottom_pixel:
             #     self.bottom_pixel = h - 1
-
-    def reset(self):
-        self.movement_velocity = (0, 0)
-        self.gravity_velocity = (0, 0)
-        self.doublejump_available = 1
-        self.cached_collision = None
-        self.spritesheet.applied_color = None
-        self.dead = False
-        self.jump_held = False
-        self.jumping = False
-        self.state = "stop_right"
-        self.doublejump_blocked = False
 
     @Object.state.setter
     def state(self, newstate):
