@@ -1,4 +1,14 @@
-from .bossfight import Phase, CycleElement, RandomCycleElement
+from .bossfight import Phase, CycleElement, RandomCycleElement, Boss
+
+
+class TTSBoss_Cycle_Brackets(CycleElement):
+    def __init__(self, phase):
+        super().__init__(phase)
+        self.duration = 900
+
+
+class TTSBoss_Phase1(Phase):
+    pass
 
 
 class TTSBoss(Boss):

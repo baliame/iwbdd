@@ -18,7 +18,10 @@ class BossfightObject(Object):
     def deactivate(self):
         pass
 
-    def fight_tick(self, advance):
+    def cutscene_tick(self):
+        pass
+
+    def fight_tick(self):
         pass
 
 
@@ -34,7 +37,6 @@ class Bossfight:
         self.ready_timer = 0
         self.boss_channel_num = 0
 
-        self.fight_cycle_timer = 0
 
     def attach_boss(self, boss):
         self.boss_template = boss
@@ -62,7 +64,6 @@ class Bossfight:
                 if isinstance(obj, BossfightObject):
                     obj.activate_fight()
         self.state = 2
-        self.fight_cycle_timer = pygame.time.get_ticks()
 
     def skip_intro(self):
         if self.state == 1:
@@ -75,9 +76,9 @@ class Bossfight:
                 self.ready_timer -= curr_call - self.last_call
                 if self.ready_timer <= 0:
                     self._start_fight()
-                self.boss.fight_tick(curr_call - self.last_call)
+                self.boss.cutscene_tick()
             elif self.state == 2:
-                self.boss.fight_tick(curr_call - self.fight_cycle_timer)
+                self.boss.fight_tick()
                 self.fight_cycle_timer = curr_call
             self.last_call = curr_call
 
@@ -113,6 +114,15 @@ class CycleElement:
         self.duration = 0
         self.phase = phase
 
+    def start_cycle_element(self):
+        pass
+
+    def end_cycle_element(self):
+        pass
+
+    def on_tick(self):
+        pass
+
 
 class RandomCycleElement:
     def __init__(self, *args):
@@ -127,12 +137,35 @@ class Phase:
         self.boss = boss
         self.cycle = []
         self.idx = 0
+        self.next_cycle_element = 0
 
     def start_cycle(self):
+        self.restart_cycle()
+        self.start_new_cycle_element()
+
+    def start_new_cycle_element(self):
+        self.current_cycle[self.idx].start_cycle_element()
+        self.next_cycle_element = self.current_cycle[self.idx].duration
+
+    def on_tick(self):
+        pass
+
+    def end_current_cycle_element(self):
+        self.current_cycle[self.idx].end_cycle_element()
+        self.idx += 1
+        if self.idx >= len(self.current_cycle):
+            self.restart_cycle()
+
+    def tick(self):
+        self.on_tick()
+        self.current_cycle[self.idx].on_tick()
+        self.next_cycle_element -= 1
+        if self.next_cycle_element <= 0:
+            self.end_current_cycle_element()
+            self.start_new_cycle_element()
+
+    def restart_cycle(self):
         self.current_cycle = []
         for el in self.cycle:
             self.current_cycle.append(el(self))
         self.idx = 0
-
-    def restart_cycle(self):
-        self.start_cycle()
