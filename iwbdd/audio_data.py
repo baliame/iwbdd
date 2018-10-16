@@ -3,7 +3,7 @@ import struct
 import pygame
 import tempfile
 import os.path
-# from io import BytesIO
+from io import BytesIO
 
 
 # DATA FORMAT: (HEADER, [AUDIO])
@@ -31,7 +31,7 @@ def pack_audio_from_files(files, dest):
 
 class Audio:
     audio_by_name = {}
-    audio_temp_dir = None
+    # audio_temp_dir = None
 
     @classmethod
     def play_by_name(cls, name, channel=None, loops=0):
@@ -42,18 +42,12 @@ class Audio:
         else:
             print("No channel.")
 
-    @staticmethod
-    def cleanup_temp():
-        if Audio.audio_temp_dir is not None:
-            Audio.audio_temp_dir.cleanup()
-            Audio.audio_temp_dir = None
-
     def __init__(self, reader=None):
         self.audio_name = ""
         self.sound = None
-        if Audio.audio_temp_dir is None:
-            Audio.audio_temp_dir = tempfile.TemporaryDirectory()
-            pygame.register_quit(Audio.cleanup_temp)
+        # if Audio.audio_temp_dir is None:
+        #    Audio.audio_temp_dir = tempfile.TemporaryDirectory()
+        #    pygame.register_quit(Audio.cleanup_temp)
         if reader is not None:
             self.read_audio_data(reader)
 
@@ -62,12 +56,14 @@ class Audio:
         self.audio_name = eofc_read(reader, audio_name_len).decode('ascii')
         data_len = struct.unpack('<L', eofc_read(reader, 4))[0]
         raw_data = eofc_read(reader, data_len)
-        temp_aud = os.path.join(Audio.audio_temp_dir.name, self.audio_name)
-        with open(temp_aud, 'wb') as f:
-            f.write(raw_data)
+        # temp_aud = os.path.join(Audio.audio_temp_dir.name, self.audio_name)
+        temp_aud = BytesIO(raw_data)
+        # with open(temp_aud, 'wb') as f:
+        #     f.write(raw_data)
         # self.sound = pygame.mixer.Sound(buffer=raw_data)
         self.sound = pygame.mixer.Sound(file=temp_aud)
         self.sound.set_volume(0.3)
+        print(self.sound.get_length())
 
     def play(self, channel=None, loops=0):
         if channel is None:
