@@ -35,6 +35,9 @@ class Audio:
 
     @classmethod
     def play_by_name(cls, name, channel=None, loops=0):
+        if name not in cls.audio_by_name:
+            print("Audio missing: {0}".format(name))
+            return
         if channel is None:
             channel = pygame.mixer.find_channel()
         if channel is not None:

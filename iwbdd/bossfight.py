@@ -37,7 +37,6 @@ class Bossfight:
         self.ready_timer = 0
         self.boss_channel_num = 0
 
-
     def attach_boss(self, boss):
         self.boss_template = boss
         self.boss = copy.copy(boss)
@@ -101,12 +100,24 @@ class Boss(BossfightObject):
     def __init__(self, screen, x=0, y=0, init_dict=None):
         super().__init__(screen, x, y, init_dict)
         self.phases = []
+        self.phase_idx = 0
+        self.health = 160
 
     def activate_fight(self):
         phc = self.phases.copy()
         phi = []
         for el in phc:
             phi.append(el(self))
+        self.phases = phi
+
+    def advance_phase(self):
+        self.phase_idx += 1
+        if self.phase_idx >= len(self.phases):
+            self.phase_idx = len(self.phases) - 1
+        self.phases[self.phase_idx].start_cycle()
+
+    def on_damage(self):
+        pass
 
 
 class CycleElement:
