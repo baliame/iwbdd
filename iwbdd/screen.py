@@ -31,10 +31,11 @@ class Collision(IntEnum):
     CONVEYOR_SOUTH_SINGLE_SPEED = 18
     SOLID_HALF_LEFT = 19
     SOLID_HALF_RIGHT = 20
+    BOSSFIGHT_INIT_TRIGGER = 21
     COLLISION_TYPE_COUNT = auto()
 
 
-COLLISIONTEST_ALL_FLAGS = CollisionTest.SOLID | CollisionTest.DEADLY | CollisionTest.TRANSITION_EAST | CollisionTest.TRANSITION_NORTH | CollisionTest.TRANSITION_WEST | CollisionTest.TRANSITION_SOUTH
+COLLISIONTEST_ALL_FLAGS = CollisionTest.SOLID | CollisionTest.DEADLY | CollisionTest.TRANSITION_EAST | CollisionTest.TRANSITION_NORTH | CollisionTest.TRANSITION_WEST | CollisionTest.TRANSITION_SOUTH | CollisionTest.BOSSFIGHT_INIT_TRIGGER
 COLLISIONTEST_PREVENTS_SIDE_GRAVITY = CollisionTest.CONVEYOR_SOUTH_SINGLE_SPEED | CollisionTest.CONVEYOR_NORTH_SINGLE_SPEED
 COLLISIONTEST_TRANSITIONS = CollisionTest.TRANSITION_EAST | CollisionTest.TRANSITION_NORTH | CollisionTest.TRANSITION_SOUTH | CollisionTest.TRANSITION_WEST
 COLLISIONTEST_COLORS = {
@@ -46,6 +47,7 @@ COLLISIONTEST_COLORS = {
     CollisionTest.CONVEYOR_SOUTH_SINGLE_SPEED: (0, 131, 0),
     CollisionTest.SAVE_TILE: (0, 0, 128),
     CollisionTest.LENS: (128, 0, 0),
+    CollisionTest.BOSSFIGHT_INIT_TRIGGER: (128, 128, 0),
 }
 
 
@@ -75,6 +77,7 @@ class Screen:
         Collision.CONVEYOR_SOUTH_SINGLE_SPEED: lambda tgt, x, y: pygame.draw.rect(tgt, COLLISIONTEST_COLORS[CollisionTest.CONVEYOR_SOUTH_SINGLE_SPEED], pygame.Rect(x, y, Tileset.TILE_W, Tileset.TILE_H)) and pygame.draw.polygon(tgt, COLLISIONTEST_COLORS[CollisionTest.SOLID], [(x + 2, y + 2), (x + Tileset.TILE_W / 2 - 1, y + Tileset.TILE_H - 3), (x + Tileset.TILE_W / 2, y + Tileset.TILE_H - 3), (x + Tileset.TILE_W - 3, y + 2)]),
         Collision.SOLID_HALF_LEFT: lambda tgt, x, y: pygame.draw.rect(tgt, COLLISIONTEST_COLORS[CollisionTest.SOLID], pygame.Rect(x, y, Tileset.TILE_W / 2, Tileset.TILE_H)),
         Collision.SOLID_HALF_RIGHT: lambda tgt, x, y: pygame.draw.rect(tgt, COLLISIONTEST_COLORS[CollisionTest.SOLID], pygame.Rect(x + Tileset.TILE_W / 2, y, Tileset.TILE_W / 2, Tileset.TILE_H)),
+        Collision.BOSSFIGHT_INIT_TRIGGER: lambda tgt, x, y: pygame.draw.rect(tgt, COLLISIONTEST_COLORS[CollisionTest.BOSSFIGHT_INIT_TRIGGER], pygame.Rect(x, y, Tileset.TILE_W, Tileset.TILE_H)),
     }
 
     collision_test_flags = {
@@ -86,6 +89,7 @@ class Screen:
         0x008300: CollisionTest.CONVEYOR_SOUTH_SINGLE_SPEED,
         0x000080: CollisionTest.SAVE_TILE,
         0x800000: CollisionTest.LENS,
+        0x808000: CollisionTest.BOSSFIGHT_INIT_TRIGGER,
     }
 
     def __init__(self, world, tile_data=None):

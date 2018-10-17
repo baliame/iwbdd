@@ -9,6 +9,9 @@ class BossfightObject(Object):
     exclude_from_object_editor = True
     saveable = False
 
+    def __init__(self, screen, x=0, y=0, init_dict=None):
+        super().__init__(screen, x, y, init_dict)
+
     def activate_cutscene(self):
         pass
 
@@ -32,6 +35,8 @@ class Bossfight:
         self.world = world
         self.ctrl = ctrl
 
+        self.triggered = False
+        self.pre_start_frames = 18
         self.state = 0
         self.last_call = 0
         self.ready_timer = 0
@@ -42,18 +47,23 @@ class Bossfight:
         self.boss = copy.copy(boss)
 
     def reset(self):
+        self.screen.objects.remove(self.boss)
         self.boss = copy.copy(self.boss_template)
         self.last_call = 0
         self.ready_timer = 0
         self.state = 0
+        self.triggered = False
+        self.pre_start_frames = 18
 
     def start(self):
         if self.screen is not None:
+            self.screen.objects.append(self.boss)
             for obj in self.screen.objects:
                 if isinstance(obj, BossfightObject):
                     obj.activate_cutscene()
-        if self.ctrl is not None:
-            self.ctrl.bossfight = self
+        if self.boss.intro_music is not None:
+            self.ctrl.music_channel.stop()
+            self.boss.intro_music.play(self.ctrl.music_channel, loops=-1)
         self.state = 1
         self.last_call = pygame.time.get_ticks()
 
@@ -62,6 +72,9 @@ class Bossfight:
             for obj in self.screen.objects:
                 if isinstance(obj, BossfightObject):
                     obj.activate_fight()
+        if self.boss.boss_music is not None:
+            self.ctrl.music_channel.stop()
+            self.boss.boss_music.play(self.ctrl.music_channel, loops=-1)
         self.state = 2
 
     def skip_intro(self):
@@ -69,6 +82,11 @@ class Bossfight:
             self._start_fight()
 
     def tick(self):
+        if self.triggered and self.pre_start_frames > 0:
+            self.pre_start_frames -= 1
+            if self.pre_start_frames == 0:
+                self.start()
+            return
         if self.state > 0:
             curr_call = pygame.time.get_ticks()
             if self.state == 1:
@@ -102,6 +120,8 @@ class Boss(BossfightObject):
         self.phases = []
         self.phase_idx = 0
         self.health = 160
+        self.intro_music = None
+        self.boss_music = None
 
     def activate_fight(self):
         phc = self.phases.copy()
@@ -109,6 +129,8 @@ class Boss(BossfightObject):
         for el in phc:
             phi.append(el(self))
         self.phases = phi
+        self.phase_idx = 0
+        self.phases[0].start_cycle()
 
     def advance_phase(self):
         self.phase_idx += 1
@@ -118,6 +140,9 @@ class Boss(BossfightObject):
 
     def on_damage(self):
         pass
+
+    def fight_tick(self):
+        self.phases[self.phase_idx].tick()
 
 
 class CycleElement:
@@ -147,6 +172,7 @@ class Phase:
     def __init__(self, boss):
         self.boss = boss
         self.cycle = []
+        self.current_cycle = []
         self.idx = 0
         self.next_cycle_element = 0
 

@@ -108,6 +108,7 @@ class Editor:
         Collision.CONVEYOR_SOUTH_SINGLE_SPEED: lambda wnd: pygame.draw.rect(wnd.display, COLLISIONTEST_COLORS[CollisionTest.CONVEYOR_SOUTH_SINGLE_SPEED], pygame.Rect(Editor.tslx, Editor.tsty, 70, 70)) and pygame.draw.polygon(wnd.display, COLLISIONTEST_COLORS[CollisionTest.SOLID], [(Editor.tslx + 4, Editor.tsty + 4), (Editor.tshx1, Editor.tsby - 4), (Editor.tshx2, Editor.tsby - 4), (Editor.tsrx - 4, Editor.tsty + 4)]),
         Collision.SOLID_HALF_LEFT: lambda wnd: pygame.draw.rect(wnd.display, (0, 0, 255), pygame.Rect(Editor.tslx, Editor.tsty, 36, 70)),
         Collision.SOLID_HALF_RIGHT: lambda wnd: pygame.draw.rect(wnd.display, (0, 0, 255), pygame.Rect(Editor.tshx1, Editor.tsty, 36, 70)),
+        Collision.BOSSFIGHT_INIT_TRIGGER: lambda wnd: pygame.draw.rect(wnd.display, (128, 128, 0), pygame.Rect(Editor.tslx, Editor.tsty, 70, 70)),
     }
 
     def __init__(self, world_file, main_loop):
@@ -284,7 +285,8 @@ class Editor:
             "coll-NONE": self.font.render("NONE", True, (255, 255, 255), 0),
             "coll-SOLID": self.font.render("SOLID", True, (0, 0, 255), 0),
             "coll-DEADLY": self.font.render("DEADLY", True, (255, 0, 0), 0),
-            "coll-CONVEYOR": self.font.render("CONVEYOR", True, (0, 128, 0), 0),
+            "coll-CONVEYOR": self.font.render("CONVEY", True, (0, 128, 0), 0),
+            "coll-TRIGGER": self.font.render("BTRIG", True, (128, 128, 0), 0),
             "sel-cut-active": self.font.render("[Cut] (X)", True, active_color, 0),
             "sel-cut-passive": self.font.render("[Cut] (X)", True, passive_color, 0),
             "sel-copy-active": self.font.render("[Copy] (C)", True, active_color, 0),
@@ -360,6 +362,7 @@ class Editor:
                 wnd.display.blit(self.render_cache["coll-SOLID"], (Editor.ts_display_x, Editor.ts_display_y + 16))
                 wnd.display.blit(self.render_cache["coll-DEADLY"], (Editor.ts_display_x, Editor.ts_display_y + 32))
                 wnd.display.blit(self.render_cache["coll-CONVEYOR"], (Editor.ts_display_x, Editor.ts_display_y + 48))
+                wnd.display.blit(self.render_cache["coll-TRIGGER"], (Editor.ts_display_x, Editor.ts_display_y + 64))
 
                 pygame.draw.polygon(wnd.display, (255, 255, 255), [(Editor.ts_display_x + 48, Editor.ts_display_y + 84), (Editor.ts_display_x + 64, Editor.ts_display_y + 76), (Editor.ts_display_x + 64, Editor.ts_display_y + 92)])
                 pygame.draw.polygon(wnd.display, (255, 255, 255), [(Editor.ts_display_x + 120, Editor.ts_display_y + 84), (Editor.ts_display_x + 104, Editor.ts_display_y + 76), (Editor.ts_display_x + 104, Editor.ts_display_y + 92)])

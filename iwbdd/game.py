@@ -92,8 +92,10 @@ class Controller:
         pygame.mixer.set_reserved(3)
         self.music_channel = pygame.mixer.Channel(0)
         self.music_channel.set_volume(self.music_volume)
+        Audio.audio_by_name['distant_thunder.ogg'].sound.set_volume(0.5)
         Audio.audio_by_name['quack.ogg'].sound.set_volume(0.1)
         Audio.audio_by_name['quack2.ogg'].sound.set_volume(0.1)
+        Audio.audio_by_name['omen.ogg'].sound.set_volume(0.2)
         self.boss_channels = [pygame.mixer.Channel(1), pygame.mixer.Channel(2)]
 
     def add_loaded_world(self, world):
@@ -145,8 +147,20 @@ class Controller:
         self.suspended = False
         for idx in self.current_world.screens:
             self.current_world.screens[idx].reset_to_initial_state()
+        self.start_world()
+
+    def start_world(self):
         if self.current_world.background_music is not None:
             self.current_world.background_music.play(self.music_channel, loops=-1)
+
+    def start_bossfight(self):
+        if self.bossfight is None:
+            print("ERROR: Bossfight not found.")
+            return
+        if self.bossfight.triggered:
+            return
+        self.music_channel.fadeout(300)
+        self.bossfight.triggered = True
 
     def save_state(self):
         self.current_screen.save_state()
@@ -202,8 +216,12 @@ class Controller:
             return
         if self.player.dead:
             return
+        if self.bossfight is not None:
+            self.bossfight.tick()
+
         keys = pygame.key.get_pressed()
         self.current_screen.generate_object_collisions()
+
         if self.player.prevent_shooting != 0:
             if self.player.prevent_shooting > 0:
                 self.player.prevent_shooting -= 1
@@ -228,6 +246,8 @@ class Controller:
             self.player.cached_collision = None
             # print("Frame failed: player overlapping solid object")
             return
+        if self.player.cached_collision[4][0] & CollisionTest.BOSSFIGHT_INIT_TRIGGER:
+            self.start_bossfight()
         if self.player.cached_collision[4][0] & COLLISIONTEST_TRANSITIONS:
             if self.player.cached_collision[4][0] & CollisionTest.TRANSITION_EAST and self.current_screen.transitions[0]:
                 self.transition(0)

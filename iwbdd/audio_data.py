@@ -66,7 +66,6 @@ class Audio:
         # self.sound = pygame.mixer.Sound(buffer=raw_data)
         self.sound = pygame.mixer.Sound(file=temp_aud)
         self.sound.set_volume(0.3)
-        print(self.sound.get_length())
 
     def play(self, channel=None, loops=0):
         if channel is None:

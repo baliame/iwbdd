@@ -9,6 +9,7 @@ from .spritesheet import pack_spritesheets_from_files, read_spritesheets
 from .audio_data import pack_audio_from_files, read_audio
 from .editor import Editor
 from .object import Object
+from .bossfight import Bossfight, Boss
 from . import object_importer
 from .game import Controller
 import time
@@ -73,7 +74,10 @@ def editor():
     except FileExistsError:
         pass
 
-    copyfile(sys.argv[1], "backups/{0}.{1}".format(sys.argv[1], time.strftime("%Y%m%d.%H%M%S")))
+    try:
+        copyfile(sys.argv[1], "backups/{0}.{1}".format(sys.argv[1], time.strftime("%Y%m%d.%H%M%S")))
+    except FileNotFoundError:
+        pass
 
     ed = Editor(sys.argv[1], m)
     m.set_keydown_handler(K_ESCAPE, ml_exit_handler)
@@ -129,20 +133,68 @@ def editor_scaled():
     m.quit()
 
 
-def world_tester():
+def boss_tester():
     m = MainLoop()
     m.init()
+    Object.enumerate_objects(Object)
     if len(sys.argv) == 1:
         print("Missing argument: world file")
         sys.exit(2)
+    cl = None
+    for item in Boss.__subclasses__():
+        if item.__name__ == sys.argv[1]:
+            cl = item
+            break
+    if cl is None:
+        print("Unknown class: ", sys.argv[1])
+        sys.exit(2)
 
-    w = Window(1024, 768, "IWBDD World Test")
+    w = Window(1008, 768, "IWBDD Boss Test")
     m.set_window(w)
 
     read_tilesets("tilesets.tls")
     read_backgrounds("backgrounds.bgs")
     read_spritesheets("spritesheets.sss")
     read_audio("audio.dat")
+
+    c = Controller(m)
+    c.load_world_from_file("boss_test_world.wld")
+    c.create_player()
+    c.use_as_main_renderer()
+    c.use_as_main_keyhandler()
+    c.start_world()
+    c.bossfight = Bossfight(c.current_world, c.current_screen, c)
+    c.current_world.bossfight = c.bossfight
+    c.bossfight.attach_boss(cl(c.current_screen, 800, 384))
+
+    m.set_keydown_handler(K_ESCAPE, ml_exit_handler)
+    m.start()
+
+    m.quit()
+
+
+def world_tester():
+    m = MainLoop()
+    m.init()
+    Object.enumerate_objects(Object)
+
+    if len(sys.argv) == 1:
+        print("Missing argument: boss class")
+        sys.exit(2)
+
+    w = Window(1008, 768, "IWBDD World Test")
+    m.set_window(w)
+
+    read_tilesets("tilesets.tls")
+    read_backgrounds("backgrounds.bgs")
+    read_spritesheets("spritesheets.sss")
+    read_audio("audio.dat")
+
+    c = Controller(m)
+    c.load_world_from_file(sys.argv[1])
+    c.create_player()
+    c.use_as_main_renderer()
+    c.use_as_main_keyhandler()
 
     m.set_keydown_handler(K_ESCAPE, ml_exit_handler)
     m.start()

@@ -1,5 +1,5 @@
 from .object import Object
-from . import moving_platform, pickups, lens
+from . import moving_platform, pickups, lens, ttsboss
 import struct
 from .common import eofc_read
 

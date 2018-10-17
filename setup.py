@@ -28,6 +28,7 @@ setup(
         ],
         'gui_scripts': [
             'iwbdd=iwbdd.iwbdd:main',
+            'iwbdd_boss=iwbdd.iwbdd:boss_tester',
             'iwbdd_prof=iwbdd.iwbdd:profiled',
             'iwbdd_editor=iwbdd.iwbdd:editor',
             'iwbdd_editor_w2=iwbdd.iwbdd:editor_w2',
