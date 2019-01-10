@@ -3,6 +3,8 @@ from .spritesheet import Spritesheet
 from .pygame_oo.main_loop import MainLoop
 import copy
 from .audio_data import Audio
+from .common import eofc_read
+import struct
 # import pygame
 # import numpy as np
 
@@ -70,6 +72,27 @@ class Player(Object):
         self.save_state.x = self.x
         self.save_state.y = self.y
 
+    def write_save_to_file(self, f):
+        f.write(struct.pack('<d', self.save_state.movement_velocity[0]))
+        f.write(struct.pack('<d', self.save_state.movement_velocity[1]))
+        f.write(struct.pack('<d', self.save_state.gravity_velocity[0]))
+        f.write(struct.pack('<d', self.save_state.gravity_velocity[1]))
+        f.write(struct.pack('<H', self.save_state.doublejump_available))
+        f.write(struct.pack('<H', len(self.save_state._state)))
+        f.write(self.save_state._state.encode('ascii'))
+        f.write(struct.pack('<d', self.save_state.x))
+        f.write(struct.pack('<d', self.save_state.y))
+
+    def restore_from_saved_file(self, f):
+        self.save_state = Player(None)
+        self.save_state.movement_velocity = [struct.unpack('<d', eofc_read(f, 8))[0], struct.unpack('<d', eofc_read(f, 8))[0]]
+        self.save_state.gravity_velocity = [struct.unpack('<d', eofc_read(f, 8))[0], struct.unpack('<d', eofc_read(f, 8))[0]]
+        self.save_state.doublejump_available = struct.unpack('<H', eofc_read(f, 2))[0]
+        sl = struct.unpack('<H', eofc_read(f, 2))[0]
+        self.save_state._state = eofc_read(f, sl).decode('ascii')
+        self.save_state.x = struct.unpack('<d', eofc_read(f, 8))[0]
+        self.save_state.y = struct.unpack('<d', eofc_read(f, 8))[0]
+
     def reset_to_saved_state(self):
         ss = self.save_state
         self.reset()
@@ -87,7 +110,7 @@ class Player(Object):
         self.gravity_velocity = [0, 0]
         self.doublejump_available = 1
         self.cached_collision = None
-        self.spritesheet.applied_color = None
+        self.spritesheet.variant_color = None
         self.dead = False
         self.jump_held = False
         self.jumping = False
@@ -153,7 +176,7 @@ class Player(Object):
         self.offset_y = self.hitboxes_cache[self.states[self._state][-1]][2]
 
     def die(self):
-        self.spritesheet.applied_color = (255, 0, 0)
+        self.spritesheet.variant_color = (255, 0, 0)
         self.dead = True
 
     def update_attachments(self):

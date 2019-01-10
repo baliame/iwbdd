@@ -3,7 +3,7 @@ import struct
 import pygame
 from .background import Background
 from .tileset import Tileset
-from .common import eofc_read, is_reader_stream, CollisionTest, COLLISIONTEST_PREVENTS_MOVEMENT, SCREEN_SIZE_W, SCREEN_SIZE_H
+from .common import eofc_read, is_reader_stream, CollisionTest, COLLISIONTEST_PREVENTS_MOVEMENT, SCREEN_SIZE_W, SCREEN_SIZE_H, COLLISIONTEST_COLORS
 from .object_importer import read_object
 from .object import ExistingSurfaceWrapper
 import copy
@@ -32,23 +32,31 @@ class Collision(IntEnum):
     SOLID_HALF_LEFT = 19
     SOLID_HALF_RIGHT = 20
     BOSSFIGHT_INIT_TRIGGER = 21
+    SOLID_BEAM_UPRIGHT_PART_1 = 22
+    SOLID_BEAM_UPRIGHT_PART_2 = 23
+    SOLID_BEAM_UPLEFT_PART_1 = 24
+    SOLID_BEAM_UPLEFT_PART_2 = 25
     COLLISION_TYPE_COUNT = auto()
 
+
+class Layer(IntEnum):
+    FOREGROUND = 0
+    BACKGROUND_1 = 1
+    BACKGROUND_2 = 2
+    LAYER_COUNT = auto()
+
+
+LayerNames = {
+    Layer.FOREGROUND: "foreground",
+    Layer.BACKGROUND_1: "background 1",
+    Layer.BACKGROUND_2: "background 2",
+}
+
+LayerDrawOrder = [Layer.BACKGROUND_2, Layer.BACKGROUND_1, Layer.FOREGROUND]
 
 COLLISIONTEST_ALL_FLAGS = CollisionTest.SOLID | CollisionTest.DEADLY | CollisionTest.TRANSITION_EAST | CollisionTest.TRANSITION_NORTH | CollisionTest.TRANSITION_WEST | CollisionTest.TRANSITION_SOUTH | CollisionTest.BOSSFIGHT_INIT_TRIGGER
 COLLISIONTEST_PREVENTS_SIDE_GRAVITY = CollisionTest.CONVEYOR_SOUTH_SINGLE_SPEED | CollisionTest.CONVEYOR_NORTH_SINGLE_SPEED
 COLLISIONTEST_TRANSITIONS = CollisionTest.TRANSITION_EAST | CollisionTest.TRANSITION_NORTH | CollisionTest.TRANSITION_SOUTH | CollisionTest.TRANSITION_WEST
-COLLISIONTEST_COLORS = {
-    CollisionTest.SOLID: (0, 0, 255),
-    CollisionTest.DEADLY: (255, 0, 0),
-    CollisionTest.CONVEYOR_EAST_SINGLE_SPEED: (0, 128, 0),
-    CollisionTest.CONVEYOR_NORTH_SINGLE_SPEED: (0, 129, 0),
-    CollisionTest.CONVEYOR_WEST_SINGLE_SPEED: (0, 130, 0),
-    CollisionTest.CONVEYOR_SOUTH_SINGLE_SPEED: (0, 131, 0),
-    CollisionTest.SAVE_TILE: (0, 0, 128),
-    CollisionTest.LENS: (128, 0, 0),
-    CollisionTest.BOSSFIGHT_INIT_TRIGGER: (128, 128, 0),
-}
 
 
 class Screen:
@@ -78,10 +86,15 @@ class Screen:
         Collision.SOLID_HALF_LEFT: lambda tgt, x, y: pygame.draw.rect(tgt, COLLISIONTEST_COLORS[CollisionTest.SOLID], pygame.Rect(x, y, Tileset.TILE_W / 2, Tileset.TILE_H)),
         Collision.SOLID_HALF_RIGHT: lambda tgt, x, y: pygame.draw.rect(tgt, COLLISIONTEST_COLORS[CollisionTest.SOLID], pygame.Rect(x + Tileset.TILE_W / 2, y, Tileset.TILE_W / 2, Tileset.TILE_H)),
         Collision.BOSSFIGHT_INIT_TRIGGER: lambda tgt, x, y: pygame.draw.rect(tgt, COLLISIONTEST_COLORS[CollisionTest.BOSSFIGHT_INIT_TRIGGER], pygame.Rect(x, y, Tileset.TILE_W, Tileset.TILE_H)),
+        Collision.SOLID_BEAM_UPRIGHT_PART_1: lambda tgt, x, y: pygame.draw.polygon(tgt, COLLISIONTEST_COLORS[CollisionTest.SOLID], [(x, y + Tileset.TILE_H - 1), (x, y + Tileset.TILE_H / 2 - 1), (x + Tileset.TILE_W / 2 - 1, y), (x + Tileset.TILE_W - 1, y)]),
+        Collision.SOLID_BEAM_UPRIGHT_PART_2: lambda tgt, x, y: pygame.draw.polygon(tgt, COLLISIONTEST_COLORS[CollisionTest.SOLID], [(x + Tileset.TILE_W - 1, y + Tileset.TILE_H - 1), (x + Tileset.TILE_W - 1, y + Tileset.TILE_H / 2), (x + Tileset.TILE_W / 2, y + Tileset.TILE_H - 1)]),
+        Collision.SOLID_BEAM_UPLEFT_PART_1: lambda tgt, x, y: pygame.draw.polygon(tgt, COLLISIONTEST_COLORS[CollisionTest.SOLID], [(x, y), (x + Tileset.TILE_W / 2 - 1, y), (x + Tileset.TILE_W - 1, y + Tileset.TILE_H / 2), (x + Tileset.TILE_W - 1, y + Tileset.TILE_H - 1)]),
+        Collision.SOLID_BEAM_UPLEFT_PART_2: lambda tgt, x, y: pygame.draw.polygon(tgt, COLLISIONTEST_COLORS[CollisionTest.SOLID], [(x, y + Tileset.TILE_H - 1), (x, y + Tileset.TILE_H / 2 + 1), (x + Tileset.TILE_W / 2 - 2, y + Tileset.TILE_H - 1)]),
     }
 
     collision_test_flags = {
         0xFF0000: CollisionTest.DEADLY,
+        0xFE0000: CollisionTest.BOSS,
         0x0000FF: CollisionTest.SOLID,
         0x008000: CollisionTest.CONVEYOR_EAST_SINGLE_SPEED,
         0x008100: CollisionTest.CONVEYOR_NORTH_SINGLE_SPEED,
@@ -94,7 +107,9 @@ class Screen:
 
     def __init__(self, world, tile_data=None):
         self.world = world
+        self.version = 1
         self.screen_id = None
+        self.pre_rendered_layer = None
         self.pre_rendered_unscaled = None
         self.pre_rendered = None
         self.background = None
@@ -105,7 +120,8 @@ class Screen:
         self.pre_rendered_collisions = None
         self.transitions = (0, 0, 0, 0)
         self.flags = 0
-        self.tiles = [[(0, 0, 0) for x in range(Screen.SCREEN_W)] for y in range(Screen.SCREEN_H)]
+        tile_tuple = tuple([0 for i in range(Layer.LAYER_COUNT * 2 + 1)])
+        self.tiles = [[tile_tuple for x in range(Screen.SCREEN_W)] for y in range(Screen.SCREEN_H)]
         self.objects = []
         self.bound_objects = []
         self.savestate_objects = []
@@ -134,6 +150,12 @@ class Screen:
         for obj in self.objects:
             if obj.__class__.saveable:
                 self.savestate_objects.append(copy.copy(obj))
+
+    def write_save_to_file(self, f):
+        pass
+
+    def restore_from_saved_file(self, f):
+        self.reset_to_initial_state()
 
     def _read_header_v1(self, reader):
         scrid = struct.unpack("<L", eofc_read(reader, 4))[0]
@@ -184,28 +206,58 @@ class Screen:
         object_count = struct.unpack("<H", eofc_read(reader, 2))[0]
         return (scrid, tr_e, tr_n, tr_w, tr_s, background_id, flags, grav_x, grav_y, jump_frames, object_count)
 
+    def _read_header_v5(self, reader):
+        return self._read_header_v4(reader)
+
+    def _read_header_v6(self, reader):
+        return self._read_header_v5(reader)
+
     def _read_header(self, reader, legacy=False):
         if legacy:
+            self.version = 1
             return self._read_header_v1(reader)
         else:
             ver = struct.unpack("<H", eofc_read(reader, 2))[0]
+            self.version = ver
             if ver == 2:
                 return self._read_header_v2(reader)
             elif ver == 3:
                 return self._read_header_v3(reader)
             elif ver == 4:
                 return self._read_header_v4(reader)
+            elif ver == 5:
+                return self._read_header_v5(reader)
+            elif ver == 6:
+                return self._read_header_v5(reader)
             else:
                 raise RuntimeError("Unknown version number: {0}".format(ver))
 
-    def _read_tile(self, reader):
+    def _read_tile_v1(self, reader):
         ts_x = struct.unpack("<H", eofc_read(reader, 2))[0]
         ts_y = struct.unpack("<H", eofc_read(reader, 2))[0]
         collision = struct.unpack("<H", eofc_read(reader, 2))[0]
-        return (ts_x, ts_y, collision)
+        return (ts_x, ts_y, 0, 0, 0, 0, collision)
+
+    def _read_tile_v5(self, reader):
+        ts_x = struct.unpack("<H", eofc_read(reader, 2))[0]
+        ts_y = struct.unpack("<H", eofc_read(reader, 2))[0]
+        decor_x = struct.unpack("<H", eofc_read(reader, 2))[0]
+        decor_y = struct.unpack("<H", eofc_read(reader, 2))[0]
+        collision = struct.unpack("<H", eofc_read(reader, 2))[0]
+        return (ts_x, ts_y, decor_x, decor_y, 0, 0, collision)
+
+    def _read_tile_v6(self, reader):
+        ts_x = struct.unpack("<H", eofc_read(reader, 2))[0]
+        ts_y = struct.unpack("<H", eofc_read(reader, 2))[0]
+        decor_x = struct.unpack("<H", eofc_read(reader, 2))[0]
+        decor_y = struct.unpack("<H", eofc_read(reader, 2))[0]
+        decor_x_2 = struct.unpack("<H", eofc_read(reader, 2))[0]
+        decor_y_2 = struct.unpack("<H", eofc_read(reader, 2))[0]
+        collision = struct.unpack("<H", eofc_read(reader, 2))[0]
+        return (ts_x, ts_y, decor_x, decor_y, decor_x_2, decor_y_2, collision)
 
     def _write_header(self, writer):
-        writer.write(struct.pack("<H", 4))
+        writer.write(struct.pack("<H", 6))
         writer.write(struct.pack("<L", self.screen_id))
         writer.write(struct.pack("<L", self.transitions[0]))
         writer.write(struct.pack("<L", self.transitions[1]))
@@ -222,6 +274,23 @@ class Screen:
         writer.write(struct.pack("<H", tile[0]))
         writer.write(struct.pack("<H", tile[1]))
         writer.write(struct.pack("<H", tile[2]))
+        writer.write(struct.pack("<H", tile[3]))
+        writer.write(struct.pack("<H", tile[4]))
+        writer.write(struct.pack("<H", tile[5]))
+        writer.write(struct.pack("<H", tile[6]))
+
+    def change_tile_graphic(self, x, y, layer, new_x, new_y):
+        tile = list(self.tiles[y][x])
+        xid = int(layer) * 2
+        yid = xid + 1
+        tile[xid] = new_x
+        tile[yid] = new_y
+        self.tiles[y][x] = tuple(tile)
+
+    def change_tile_collision(self, x, y, collision):
+        tile = list(self.tiles[y][x])
+        tile[-1] = collision
+        self.tiles[y][x] = tuple(tile)
 
     # Data format:
     # (HEADER, [<24>[<32>TILE]])
@@ -230,11 +299,17 @@ class Screen:
     def load_tile_data(self, tile_data):
         if is_reader_stream(tile_data):
             header = self._read_header(tile_data)
+            if self.version >= 6:
+                tile_read_func = self._read_tile_v6
+            elif self.version >= 5:
+                tile_read_func = self._read_tile_v5
+            else:
+                tile_read_func = self._read_tile_v1
             tiles = []
             for y in range(Screen.SCREEN_H):
                 row = []
                 for x in range(Screen.SCREEN_W):
-                    row.append(self._read_tile(tile_data))
+                    row.append(tile_read_func(tile_data))
                 tiles.append(row)
             self.screen_id = header[0]
             self.transitions = (header[1], header[2], header[3], header[4])
@@ -248,10 +323,7 @@ class Screen:
                 self.bound_objects.append(obj)
                 self.savestate_objects.append(copy.copy(obj))
         else:
-            self.screen_id = tile_data[0][0]
-            self.transitions = (tile_data[0][1], tile_data[0][2], tile_data[0][3], tile_data[0][4])
-            self.flags = tile_data[0][5]
-            self.tiles = tile_data[1]
+            raise RuntimeError("Only readers are allowed for tile data reading.")
         self.reset_to_initial_state()
 
     def write_tile_data(self, target):
@@ -262,15 +334,19 @@ class Screen:
         for i in range(len(self.bound_objects)):
             self.bound_objects[i].write_to_writer(target)
 
-    def render_to_window(self, wnd):
+    def render_to_window(self, wnd, layer=None):
         win_w = wnd.display.get_width()
         win_h = wnd.display.get_height()
         resizing = False
         if self.pre_rendered is not None:
-            pr_w = self.pre_rendered.get_width()
-            pr_h = self.pre_rendered.get_height()
-            if pr_w != win_w or pr_h != win_h:
-                resizing = True
+            if (layer is None and self.pre_rendered_layer is not None) or (layer is not None and self.pre_rendered_layer is None) or (layer is not None and self.pre_rendered_layer is not None and layer != self.pre_rendered_layer):
+                self.dirty = True
+                self.pre_rendered_layer = layer
+            else:
+                pr_w = self.pre_rendered.get_width()
+                pr_h = self.pre_rendered.get_height()
+                if pr_w != win_w or pr_h != win_h:
+                    resizing = True
         else:
             pr_w = win_w
             pr_h = win_h
@@ -282,11 +358,18 @@ class Screen:
             for y in range(Screen.SCREEN_H):
                 for x in range(Screen.SCREEN_W):
                     tile = self.tiles[y][x]
-                    src_x = tile[0] * Tileset.TILE_W
-                    src_y = tile[1] * Tileset.TILE_H
-                    dest_x = x * Tileset.TILE_W
-                    dest_y = y * Tileset.TILE_H
-                    self.pre_rendered_unscaled.blit(self.world.tileset.image_surface, (dest_x, dest_y), pygame.Rect(src_x, src_y, Tileset.TILE_W, Tileset.TILE_H))
+                    if layer is None:
+                        layers_to_draw = LayerDrawOrder
+                    else:
+                        layers_to_draw = [layer]
+                    for l in layers_to_draw:
+                        xidx = int(l) * 2
+                        yidx = xidx + 1
+                        src_x = tile[xidx] * Tileset.TILE_W
+                        src_y = tile[yidx] * Tileset.TILE_H
+                        dest_x = x * Tileset.TILE_W
+                        dest_y = y * Tileset.TILE_H
+                        self.pre_rendered_unscaled.blit(self.world.tileset.image_surface, (dest_x, dest_y), pygame.Rect(src_x, src_y, Tileset.TILE_W, Tileset.TILE_H))
             self.dirty = False
             resizing = True
         if resizing or self.pre_rendered is None:
@@ -304,7 +387,8 @@ class Screen:
 
     def render_objects_hitboxes(self, wnd):
         for obj in self.objects:
-            obj.draw_as_hitbox(wnd, (0, 255, 0))
+            if obj.hitbox_type in COLLISIONTEST_COLORS:
+                obj.draw_as_hitbox(wnd, COLLISIONTEST_COLORS[obj.hitbox_type])
 
     def ensure_unscaled_collisions(self):
         if self.dirty_collisions or self.pre_rendered_unscaled_collisions is None:
@@ -316,7 +400,7 @@ class Screen:
                     tile = self.tiles[y][x]
                     dest_x = x * Tileset.TILE_W
                     dest_y = y * Tileset.TILE_H
-                    Screen.collision_overlays[Collision(tile[2])](self.pre_rendered_unscaled_collisions, dest_x, dest_y)
+                    Screen.collision_overlays[Collision(tile[-1])](self.pre_rendered_unscaled_collisions, dest_x, dest_y)
             self.dirty_collisions = False
             return True
         return False
@@ -408,7 +492,7 @@ class Screen:
         lx = x + bbw - 1
         ly = y + bbh - 1
         for obj in self.objects:
-            if obj.hitbox_type == interactable_type:
+            if obj.hitbox_type & interactable_type:
                 obw = len(obj.hitbox)
                 obh = len(obj.hitbox[0])
                 olx = int(obj.x) + obw
@@ -436,5 +520,5 @@ class Screen:
         wnd.display.blit(self.pre_rendered_collisions, (0, 0))
 
     def tick(self, ctrl):
-        for obj in self.objects:
+        for obj in self.objects.copy():
             obj.tick(self, ctrl)

@@ -38,9 +38,23 @@ class CollisionTest(IntEnum):
     SAVE_TILE = 2048
     LENS = 4096
     BULLET_INTERACTABLE = 8192
+    BOSS = 8194
     BOSSFIGHT_INIT_TRIGGER = 16384
 
 
 COLLISIONTEST_PREVENTS_MOVEMENT = CollisionTest.SOLID | CollisionTest.CONVEYOR_EAST_SINGLE_SPEED | CollisionTest.CONVEYOR_SOUTH_SINGLE_SPEED | CollisionTest.CONVEYOR_WEST_SINGLE_SPEED | CollisionTest.CONVEYOR_NORTH_SINGLE_SPEED
 SCREEN_SIZE_W = 1008
 SCREEN_SIZE_H = 768
+
+COLLISIONTEST_COLORS = {
+    CollisionTest.SOLID: (0, 0, 255),
+    CollisionTest.DEADLY: (255, 0, 0),
+    CollisionTest.CONVEYOR_EAST_SINGLE_SPEED: (0, 128, 0),
+    CollisionTest.CONVEYOR_NORTH_SINGLE_SPEED: (0, 129, 0),
+    CollisionTest.CONVEYOR_WEST_SINGLE_SPEED: (0, 130, 0),
+    CollisionTest.CONVEYOR_SOUTH_SINGLE_SPEED: (0, 131, 0),
+    CollisionTest.SAVE_TILE: (0, 0, 128),
+    CollisionTest.LENS: (128, 0, 0),
+    CollisionTest.BOSSFIGHT_INIT_TRIGGER: (128, 128, 0),
+    CollisionTest.BOSS: (254, 0, 0),
+}

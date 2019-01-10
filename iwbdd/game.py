@@ -1,10 +1,12 @@
 from .world import World
 from .player import Player
-from .screen import COLLISIONTEST_PREVENTS_SIDE_GRAVITY, COLLISIONTEST_TRANSITIONS
+from .screen import COLLISIONTEST_PREVENTS_SIDE_GRAVITY, COLLISIONTEST_TRANSITIONS, eofc_read
 from .common import CollisionTest, COLLISIONTEST_PREVENTS_MOVEMENT, SCREEN_SIZE_W, SCREEN_SIZE_H
 from .object import Bullet
+import struct
 from .audio_data import Audio
 from collections import defaultdict
+from .savestate import Savestate
 import pygame
 from enum import IntEnum
 
@@ -23,6 +25,7 @@ class Controls(IntEnum):
     JUMP = 2
     SHOOT = 3
     RESET = 4
+    SKIP = 5
 
 
 # 4 tiles = 96 px
@@ -59,11 +62,12 @@ class Controller:
         Controls.JUMP: pygame.K_SPACE,
         Controls.SHOOT: pygame.K_a,
         Controls.RESET: pygame.K_r,
+        Controls.SKIP: pygame.K_s,
     }
     movement_speed = 2
     default_music_volume = 0.8
 
-    def __init__(self, main_loop):
+    def __init__(self, main_loop, editor_control=False):
         if Controller.instance is not None:
             raise RuntimeError("Editor must be a singleton.")
         Controller.instance = self
@@ -77,6 +81,7 @@ class Controller:
             self.keybindings_lookup[self.keybindings[ctrl]] = ctrl
         self.suspended = False
         self.render_collisions = False
+        self.also_render_objects = False
         self.saved_state = None
 
         self.player = None
@@ -84,6 +89,8 @@ class Controller:
         self.trigger_group = defaultdict(int)
         self.trigger_cache = defaultdict(int)
         self.bossfight = None
+        self.savefile = Savestate("save.sav")
+        self.editor_controlled = editor_control
         main_loop.add_ticker(self)
         self.ml = main_loop
 
@@ -92,11 +99,21 @@ class Controller:
         pygame.mixer.set_reserved(3)
         self.music_channel = pygame.mixer.Channel(0)
         self.music_channel.set_volume(self.music_volume)
-        Audio.audio_by_name['distant_thunder.ogg'].sound.set_volume(0.5)
-        Audio.audio_by_name['quack.ogg'].sound.set_volume(0.1)
-        Audio.audio_by_name['quack2.ogg'].sound.set_volume(0.1)
-        Audio.audio_by_name['omen.ogg'].sound.set_volume(0.2)
+        self.curr_music = None
         self.boss_channels = [pygame.mixer.Channel(1), pygame.mixer.Channel(2)]
+
+    def ambience(self, name):
+        Audio.audio_by_name[name].play()
+
+    def music(self, name):
+        if isinstance(name, Audio):
+            name = name.audio_name
+        if self.curr_music == name:
+            return
+        self.music_channel.stop()
+        self.curr_music = name
+        if name is not None:
+            Audio.audio_by_name[name].play(self.music_channel, loops=-1)
 
     def add_loaded_world(self, world):
         self.worlds.append(world)
@@ -127,6 +144,10 @@ class Controller:
                 self.player.y = self.current_world.start_y
             self.player.screen = self.current_screen
 
+    def check_save_file(self):
+        if not self.editor_controlled:
+            self.savefile.read(self)
+
     def reset_from_editor(self, editor):
         self.player.reset()
         self.current_world = editor.edited_world
@@ -140,8 +161,12 @@ class Controller:
         self.trigger_cache = defaultdict(int)
         self.saved_state = None
         self.suspended = True
+        if self.bossfight is not None:
+            self.bossfight.reset()
         self.bossfight = None
+        self.current_world.bossfight = None
         self.music_channel.stop()
+        self.curr_music = None
 
     def start_from_editor(self, editor):
         self.suspended = False
@@ -150,8 +175,9 @@ class Controller:
         self.start_world()
 
     def start_world(self):
+        self.current_world.start_simulation(self)
         if self.current_world.background_music is not None:
-            self.current_world.background_music.play(self.music_channel, loops=-1)
+            self.music(self.current_world.background_music)
 
     def start_bossfight(self):
         if self.bossfight is None:
@@ -160,20 +186,60 @@ class Controller:
         if self.bossfight.triggered:
             return
         self.music_channel.fadeout(300)
+        self.curr_music = None
         self.bossfight.triggered = True
 
     def save_state(self):
         self.current_screen.save_state()
+        saved_screens = [self.current_screen.screen_id]
         for transition in self.current_screen.transitions:
             trd = []
             if transition != 0 and transition not in trd:
                 self.current_world.screens[transition].save_state()
                 trd.append(transition)
+                saved_screens.append(self.current_world.screens[transition].screen_id)
         self.player.create_save_state()
         self.saved_state = {
             "screen": self.current_screen.screen_id,
-            "trigger_group": self.trigger_group.copy()
+            "trigger_group": self.trigger_group.copy(),
+            "saved_screens": saved_screens,
         }
+        if not self.editor_controlled:
+            self.savefile.write(self)
+
+    def write_save_to_file(self, f):
+        f.write(struct.pack('<H', self.saved_state['screen']))
+        f.write(struct.pack('<H', len(self.saved_state['saved_screens'])))
+        for sid in self.saved_state['saved_screens']:
+            f.write(struct.pack('<L', sid))
+        f.write(struct.pack('<H', len(self.saved_state["trigger_group"])))
+        for k, v in self.saved_state["trigger_group"].items():
+            f.write(struct.pack('<H', k))
+            f.write(struct.pack('<l', v))
+        self.player.write_save_to_file(f)
+        for sid in self.saved_state['saved_screens']:
+            f.write(struct.pack("<L", self.current_world.screens[sid].screen_id))
+            self.current_world.screens[sid].write_save_to_file(f)
+
+    def restore_from_saved_file(self, f):
+        self.saved_state = {}
+        self.saved_state["screen"] = struct.unpack('<H', eofc_read(f, 2))[0]
+        ss = []
+        ssl = struct.unpack('<H', eofc_read(f, 2))[0]
+        for i in range(ssl):
+            ss.append(struct.unpack('<L', eofc_read(f, 4))[0])
+        self.saved_state["trigger_group"] = defaultdict(int)
+        tg = struct.unpack('<H', eofc_read(f, 2))[0]
+        for i in range(tg):
+            k = struct.unpack('<H', eofc_read(f, 2))[0]
+            v = struct.unpack('<l', eofc_read(f, 4))[0]
+            self.saved_state["trigger_group"][k] = v
+        self.saved_state["saved_screens"] = ss
+        self.player.restore_from_saved_file(f)
+        for sid in ss:
+            eofc_read(f, 4)
+            self.current_world.screens[sid].restore_from_saved_file(f)
+        self.reset_to_save()
 
     # TODO: Save states
     def reset_to_save(self):
@@ -185,13 +251,21 @@ class Controller:
             self.player.x = self.current_world.start_x
             self.player.y = self.current_world.start_y
             self.trigger_group = defaultdict(int)
-            self.bossfight = None
+            if self.bossfight is not None:
+                self.bossfight.reset()
+            for chan in self.boss_channels:
+                chan.stop()
+            self.music(self.current_world.background_music)
         else:
             self.player.reset_to_saved_state()
             self.current_screen = self.current_world.screens[self.saved_state["screen"]]
             self.trigger_group = self.saved_state["trigger_group"].copy()
             self.player.screen = self.current_screen
-            self.bossfight = None
+            if self.bossfight is not None:
+                self.bossfight.reset()
+            for chan in self.boss_channels:
+                chan.stop()
+            self.music(self.current_world.background_music)
         for idx in self.current_world.screens:
             if idx == self.current_screen.screen_id or idx in self.current_screen.transitions:
                 self.current_world.screens[idx].reset_to_saved_state()
@@ -216,10 +290,17 @@ class Controller:
             return
         if self.player.dead:
             return
+        keys = pygame.key.get_pressed()
         if self.bossfight is not None:
+            if keys[self.keybindings[Controls.SKIP]]:
+                self.bossfight.skip()
+            if keys[pygame.K_k] and self.editor_controlled and self.bossfight.boss is not None and self.bossfight.state == 2 and not self.bossfight.boss.dead:
+                self.bossfight.boss.health -= 5
+                if self.bossfight.boss.health <= 0:
+                    self.bossfight.boss.health = 1
+
             self.bossfight.tick()
 
-        keys = pygame.key.get_pressed()
         self.current_screen.generate_object_collisions()
 
         if self.player.prevent_shooting != 0:
@@ -508,8 +589,14 @@ class Controller:
                 self.player.draw(wnd)
             else:
                 self.current_screen.render_collisions_to_window(wnd)
+                if self.also_render_objects:
+                    self.current_screen.render_objects(wnd)
                 self.current_screen.render_objects_hitboxes(wnd)
                 self.player.draw_as_hitbox(wnd, (0, 255, 0))
+            if self.bossfight and self.bossfight.state >= 2:
+                pygame.draw.rect(wnd.display, (0, 0, 0), pygame.Rect(982 - self.bossfight.boss.initial_health, 23, self.bossfight.boss.initial_health + 2, 26))
+                if self.bossfight.boss.health > 0:
+                    pygame.draw.rect(wnd.display, (255, 255, 255), pygame.Rect(983 - self.bossfight.boss.initial_health, 24, self.bossfight.boss.health, 24))
 
     def keydown_handler(self, event, ml):
         if event.key in self.keybindings_lookup:

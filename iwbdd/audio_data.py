@@ -15,6 +15,7 @@ def read_audio(source):
         for i in range(audio_cnt):
             t = Audio(f)
             Audio.audio_by_name[t.audio_name] = t
+    Audio.pre_equalizer()
 
 
 def pack_audio_from_files(files, dest):
@@ -34,6 +35,34 @@ class Audio:
     # audio_temp_dir = None
 
     @classmethod
+    def pre_equalizer(cls):
+        Audio.audio_by_name["opening_curly_bracket.ogg"].sound.set_volume(0.6)
+        Audio.audio_by_name["opening_curly_bracket_2.ogg"].sound.set_volume(0.6)
+        Audio.audio_by_name["opening_square_bracket.ogg"].sound.set_volume(0.6)
+        Audio.audio_by_name["opening_square_bracket_2.ogg"].sound.set_volume(0.6)
+        Audio.audio_by_name["opening_parentheses.ogg"].sound.set_volume(0.6)
+        Audio.audio_by_name["opening_parentheses_2.ogg"].sound.set_volume(0.6)
+        Audio.audio_by_name["closing_curly_bracket.ogg"].sound.set_volume(0.6)
+        Audio.audio_by_name["closing_curly_bracket_2.ogg"].sound.set_volume(0.6)
+        Audio.audio_by_name["closing_square_bracket.ogg"].sound.set_volume(0.6)
+        Audio.audio_by_name["closing_square_bracket_2.ogg"].sound.set_volume(0.6)
+        Audio.audio_by_name["closing_parentheses.ogg"].sound.set_volume(0.6)
+        Audio.audio_by_name["closing_parentheses_2.ogg"].sound.set_volume(0.6)
+        Audio.audio_by_name["at.ogg"].sound.set_volume(0.6)
+        Audio.audio_by_name["ats_27.ogg"].sound.set_volume(0.6)
+        Audio.audio_by_name["ats_64.ogg"].sound.set_volume(0.6)
+        Audio.audio_by_name["prepare_to_die.ogg"].sound.set_volume(0.6)
+        Audio.audio_by_name["prepare_to_die_2.ogg"].sound.set_volume(0.6)
+        Audio.audio_by_name['distant_thunder.ogg'].sound.set_volume(0.5)
+        Audio.audio_by_name['quack.ogg'].sound.set_volume(0.1)
+        Audio.audio_by_name['quack2.ogg'].sound.set_volume(0.1)
+        Audio.audio_by_name['omen.ogg'].sound.set_volume(0.2)
+        Audio.audio_by_name['donation.ogg'].sound.set_volume(0.6)
+        Audio.audio_by_name['bits.ogg'].sound.set_volume(0.5)
+        Audio.audio_by_name['hit.ogg'].sound.set_volume(0.2)
+        Audio.audio_by_name['explosion.ogg'].sound.set_volume(0.5)
+
+    @classmethod
     def play_by_name(cls, name, channel=None, loops=0):
         if name not in cls.audio_by_name:
             print("Audio missing: {0}".format(name))
@@ -42,8 +71,6 @@ class Audio:
             channel = pygame.mixer.find_channel()
         if channel is not None:
             channel.play(cls.audio_by_name[name].sound, loops=loops)
-        else:
-            print("No channel.")
 
     def __init__(self, reader=None):
         self.audio_name = ""
@@ -65,7 +92,6 @@ class Audio:
         #     f.write(raw_data)
         # self.sound = pygame.mixer.Sound(buffer=raw_data)
         self.sound = pygame.mixer.Sound(file=temp_aud)
-        self.sound.set_volume(0.3)
 
     def play(self, channel=None, loops=0):
         if channel is None:

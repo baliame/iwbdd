@@ -1,3 +1,4 @@
+import numpy as np
 from .common import eofc_read
 import struct
 import pygame
@@ -57,13 +58,32 @@ class Spritesheet:
         self.spritesheet_id = 0
         self.spritesheet_name = ""
         self.image_surface = None
-        self.image_surface_colored = None
+        self.variants = {}
         self.cell_w = 0
         self.cell_h = 0
-        self.applied_color = None
-        self._applied_color = None
+        self.variant_color = None
+        self.variant_alpha = 255
+        self.variant_downscale = 1
         if reader is not None:
             self.read_spritesheet_data(reader)
+
+    def precache_variant(self, variant_color=None, variant_alpha=255, variant_downscale=1):
+        key = (variant_color, variant_alpha, variant_downscale)
+        if key in self.variants:
+            return
+        base = self.variants[(None, 255, 1)].copy()
+        if variant_color is not None:
+            temp = pygame.Surface(base.get_size())
+            temp.fill(variant_color)
+            base.blit(temp, (0, 0), None, BLEND_RGB_MULT)
+        if variant_alpha < 255:
+            sa = pygame.surfarray.pixels_alpha(base)
+            sa[sa > variant_alpha] = variant_alpha
+        if variant_downscale != 1:
+            src_size = base.get_size()
+            dest_size = (int(src_size[0] / variant_downscale), int(src_size[1] / variant_downscale))
+            base = pygame.transform.scale(base, dest_size)
+        self.variants[key] = base
 
     def read_spritesheet_data(self, reader):
         self.spritesheet_id = struct.unpack('<L', eofc_read(reader, 4))[0]
@@ -74,6 +94,7 @@ class Spritesheet:
         data_len = struct.unpack('<L', eofc_read(reader, 4))[0]
         raw_png = eofc_read(reader, data_len)
         self.image_surface = pygame.image.load(BytesIO(raw_png)).convert_alpha()
+        self.variants[(None, 255, 1)] = self.image_surface
 
     def check_applied_color(self):
         if self.image_surface_colored is None or self.applied_color != self._applied_color:
@@ -85,5 +106,28 @@ class Spritesheet:
             self._applied_color = self.applied_color
 
     def draw_cell_to(self, target, x, y, draw_x, draw_y):
-        self.check_applied_color()
-        target.blit(self.image_surface_colored, (draw_x, draw_y), pygame.Rect(x * self.cell_w, y * self.cell_h, self.cell_w, self.cell_h))
+        variant_scale = 1 / self.variant_downscale
+        variant_key = (self.variant_color, self.variant_alpha, self.variant_downscale)
+        if variant_key not in self.variants:
+            self.precache_variant(self.variant_color, self.variant_alpha, self.variant_downscale)
+        target.blit(self.variants[variant_key], (draw_x, draw_y), pygame.Rect(int(x * self.cell_w * variant_scale), int(y * self.cell_h * variant_scale), int(self.cell_w * variant_scale), int(self.cell_h * variant_scale)))
+
+    def make_hitbox(self, cell_x, cell_y, variant_downscale=1, alpha_threshold=1):
+        temp = self.variant_downscale
+        self.variant_downscale = variant_downscale
+        vs = 1 / variant_downscale
+        surf = pygame.Surface((int(self.cell_w * vs), int(self.cell_h * vs)), flags=pygame.SRCALPHA)
+        self.draw_cell_to(surf, cell_x, cell_y, 0, 0)
+        sa = pygame.surfarray.array_alpha(surf)
+        cond = np.nonzero(sa)
+        rmin = np.min(cond[0])
+        rmax = np.max(cond[0])
+        cmin = np.min(cond[1])
+        cmax = np.max(cond[1])
+        ox = -rmin
+        oy = -cmin
+        hitbox = sa[rmin:rmax, cmin:cmax]
+        hitbox[hitbox < alpha_threshold] = 0
+        hitbox[hitbox > 0] = 1
+        self.variant_scale = temp
+        return (hitbox, ox, oy)

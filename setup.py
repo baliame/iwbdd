@@ -30,6 +30,7 @@ setup(
             'iwbdd=iwbdd.iwbdd:main',
             'iwbdd_boss=iwbdd.iwbdd:boss_tester',
             'iwbdd_prof=iwbdd.iwbdd:profiled',
+            'iwbdd_bossprof=iwbdd.iwbdd:profiled_boss',
             'iwbdd_editor=iwbdd.iwbdd:editor',
             'iwbdd_editor_w2=iwbdd.iwbdd:editor_w2',
             'iwbdd_editor_scaled=iwbdd.iwbdd:editor_scaled'

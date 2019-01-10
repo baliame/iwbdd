@@ -25,6 +25,7 @@ def main():
     m = MainLoop()
     m.init()
     Object.enumerate_objects(Object)
+    Boss.enumerate_bosses()
     w = Window(1008, 768, "IWBDD")
     m.set_window(w)
     m.set_keydown_handler(K_ESCAPE, ml_exit_handler)
@@ -37,6 +38,8 @@ def main():
     c = Controller(m)
     c.load_world_from_file(sys.argv[1])
     c.create_player()
+    c.start_world()
+    c.check_save_file()
     c.use_as_main_renderer()
     c.use_as_main_keyhandler()
 
@@ -53,6 +56,14 @@ def profiled():
     pr.print_stats('cumulative')
 
 
+def profiled_boss():
+    pr = profile.Profile()
+    pr.enable()
+    pr.runcall(boss_tester)
+    # pr.dump_stats('prof.out')
+    pr.print_stats('cumulative')
+
+
 def editor():
     m = MainLoop()
     m.init()
@@ -61,6 +72,7 @@ def editor():
         sys.exit(2)
 
     Object.enumerate_objects(Object)
+    Boss.enumerate_bosses()
     w = Window(1600, 768, "IWBDD Editor")
     m.set_window(w)
 
@@ -166,6 +178,9 @@ def boss_tester():
     c.bossfight = Bossfight(c.current_world, c.current_screen, c)
     c.current_world.bossfight = c.bossfight
     c.bossfight.attach_boss(cl(c.current_screen, 800, 384))
+    c.bossfight.dev_mode = True
+    # c.also_render_objects = True
+    # c.render_collisions = True
 
     m.set_keydown_handler(K_ESCAPE, ml_exit_handler)
     m.start()

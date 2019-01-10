@@ -82,6 +82,7 @@ class Object:
         self.time_accumulator = 0
         self.last_sync_stamp = MainLoop.render_sync_stamp
         self.hitbox = None
+        self.managed_hbds = False
         self.hitbox_type = CollisionTest.PASSABLE
 
         self.hb_bg_w = 0
@@ -100,8 +101,9 @@ class Object:
 
     @offset_x.setter
     def offset_x(self, value):
-        self.hbds_dirty = True
-        self._offset_x = value
+        if value != self._offset_x:
+            self.hbds_dirty = True
+            self._offset_x = value
 
     @property
     def offset_y(self):
@@ -109,8 +111,9 @@ class Object:
 
     @offset_y.setter
     def offset_y(self, value):
-        self.hbds_dirty = True
-        self._offset_y = value
+        if value != self._offset_y:
+            self.hbds_dirty = True
+            self._offset_y = value
 
     @property
     def state(self):
@@ -155,34 +158,40 @@ class Object:
     def object_editor_draw(self, wnd):
         self.draw(wnd)
 
+    def _regen_hitbox(self, color):
+        w = len(self.hitbox)
+        if w <= 0:
+            self.hitbox_draw_surface = None
+            return
+        h = len(self.hitbox[0])
+        self.hitbox_draw_surface = pygame.Surface((w if w > self.hb_bg_w else self.hb_bg_w, h if h > self.hb_bg_h else self.hb_bg_h), SRCALPHA)
+        self.hitbox_draw_surface_color = color
+        self.hbds_dirty = False
+        with pygame.PixelArray(self.hitbox_draw_surface) as hdpa:
+            fill = (color[0], color[1], color[2], 0) if self.hb_bg_w == 0 or self.hb_bg_h == 0 else (color[0], color[1], color[2], 64)
+            hdpa[:] = fill
+            for yo in range(h):
+                for xo in range(w):
+                    if self.hitbox[xo, yo]:
+                        if self.hb_bg_w == 0 or self.hb_bg_h == 0:
+                            hdpa[xo, yo] = (color[0], color[1], color[2], 255)
+                        else:
+                            hdpa[xo + abs(self._offset_x), yo + abs(self._offset_y)] = (color[0], color[1], color[2], 255)
+
     def draw_as_hitbox(self, wnd, color):
+        if self.hitbox is None or self.hidden:
+                return
         ix = int(self.x)
         iy = int(self.y)
-        if self.hitbox is None:
-            return
-        if self.hbds_dirty or self.hitbox_draw_surface is None or color != self.hitbox_draw_surface_color:
-            w = len(self.hitbox)
-            if w <= 0:
-                return
-            h = len(self.hitbox[0])
-            self.hitbox_draw_surface = pygame.Surface((w if w > self.hb_bg_w else self.hb_bg_w, h if h > self.hb_bg_h else self.hb_bg_h), SRCALPHA)
-            self.hitbox_draw_surface_color = color
-            self.hbds_dirty = False
-            with pygame.PixelArray(self.hitbox_draw_surface) as hdpa:
-                fill = (color[0], color[1], color[2], 0) if self.hb_bg_w == 0 or self.hb_bg_h == 0 else (color[0], color[1], color[2], 64)
-                hdpa[:] = fill
-                for yo in range(h):
-                    for xo in range(w):
-                        if self.hitbox[xo, yo]:
-                            if self.hb_bg_w == 0 or self.hb_bg_h == 0:
-                                hdpa[xo, yo] = (color[0], color[1], color[2], 255)
-                            else:
-                                hdpa[xo + abs(self._offset_x), yo + abs(self._offset_y)] = (color[0], color[1], color[2], 255)
+        if not self.managed_hbds:
+            if self.hbds_dirty or self.hitbox_draw_surface is None or color != self.hitbox_draw_surface_color:
+                self._regen_hitbox(color)
         if self.hb_bg_w == 0 or self.hb_bg_h == 0:
             dest = (ix, iy)
         else:
             dest = (ix + self._offset_x, iy + self._offset_y)
-        wnd.display.blit(self.hitbox_draw_surface, dest)
+        if self.hitbox_draw_surface is not None:
+            wnd.display.blit(self.hitbox_draw_surface, dest)
 
     def tick(self, scr, ctrl):
         pass
@@ -322,6 +331,34 @@ class Object:
             elif spec[0] == EPType.PointSelector:
                 writer.write(struct.pack("<H", val[0]))
                 writer.write(struct.pack("<H", val[1]))
+
+
+class ExplosionEffect(Object):
+    exclude_from_object_editor = True
+    saveable = False
+
+    def __init__(self, screen, x=0, y=0, init_dict=None):
+        self.hitbox = None
+        super().__init__(screen, x, y, init_dict)
+        self.spritesheet = Spritesheet.spritesheets_byname["ss_explosion-48-48.png"]
+        self.states = {
+            "hidden": (False, (0, 1)),
+            "exploding": (True, 0.125, [(0, 0), (1, 0), (2, 0), (3, 0), (4, 0), (5, 0), (6, 0), (7, 0)], "done"),
+            "done": (False, (0, 1)),
+        }
+        self.state = "hidden"
+
+    def start(self, ctrl):
+        self.screen.objects.append(self)
+        ctrl.ambience("explosion.ogg")
+        self.state = "exploding"
+
+    def tick(self, scr, ctrl):
+        if self.state == 'done':
+            try:
+                self.screen.objects.remove(self)
+            except:
+                pass
 
 
 class Bullet(Object):

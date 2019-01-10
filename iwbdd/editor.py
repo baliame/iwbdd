@@ -1,11 +1,13 @@
+from collections import OrderedDict
 from .background import Background
 from .tileset import Tileset
-from .screen import Screen, Collision, COLLISIONTEST_COLORS
+from .screen import Screen, Collision, Layer, LayerNames
 from .world import World
 from .game import Controller
 from .object import Object
-from .common import mousebox, CollisionTest, SCREEN_SIZE_W, SCREEN_SIZE_H
+from .common import mousebox, CollisionTest, SCREEN_SIZE_W, SCREEN_SIZE_H, COLLISIONTEST_COLORS
 from .audio_data import Audio
+from .bossfight import Boss
 from enum import IntEnum
 import pygame
 from pygame.locals import K_f, K_m, K_r, K_q, K_s, K_x, K_n, K_LEFT, K_RIGHT, K_UP, K_DOWN, K_PAGEUP, K_PAGEDOWN, K_DELETE, K_RETURN, K_BACKSPACE, K_c, K_v, K_o, K_i
@@ -24,13 +26,20 @@ class EditingMode(IntEnum):
     SELECTION = 2
     OBJECTS = 3
     OBJECT_LIST = 4
-    MODE_SWITCH_ROLLOVER = 5
-    SIMULATION = 5
-    FRAMEBYFRAME = 6
+    BOSS = 5
+    MODE_SWITCH_ROLLOVER = 6
+    SIMULATION = 6
+    FRAMEBYFRAME = 7
 
 
 EditingModeLock = (EditingMode.SIMULATION, EditingMode.FRAMEBYFRAME)
 SimulationModes = (EditingMode.SIMULATION, EditingMode.FRAMEBYFRAME)
+
+LayerLabels = OrderedDict({
+    Layer.FOREGROUND: "FG ",
+    Layer.BACKGROUND_1: "BG1",
+    Layer.BACKGROUND_2: "BG2",
+})
 
 
 class Editor:
@@ -109,6 +118,10 @@ class Editor:
         Collision.SOLID_HALF_LEFT: lambda wnd: pygame.draw.rect(wnd.display, (0, 0, 255), pygame.Rect(Editor.tslx, Editor.tsty, 36, 70)),
         Collision.SOLID_HALF_RIGHT: lambda wnd: pygame.draw.rect(wnd.display, (0, 0, 255), pygame.Rect(Editor.tshx1, Editor.tsty, 36, 70)),
         Collision.BOSSFIGHT_INIT_TRIGGER: lambda wnd: pygame.draw.rect(wnd.display, (128, 128, 0), pygame.Rect(Editor.tslx, Editor.tsty, 70, 70)),
+        Collision.SOLID_BEAM_UPRIGHT_PART_1: lambda wnd: pygame.draw.polygon(wnd.display, COLLISIONTEST_COLORS[CollisionTest.SOLID], [(Editor.tslx, Editor.tsby), (Editor.tslx, Editor.tshy2), (Editor.tshx1, Editor.tsty), (Editor.tsrx, Editor.tsty)]),
+        Collision.SOLID_BEAM_UPRIGHT_PART_2: lambda wnd: pygame.draw.polygon(wnd.display, COLLISIONTEST_COLORS[CollisionTest.SOLID], [(Editor.tsrx, Editor.tsby), (Editor.tsrx, Editor.tshy2), (Editor.tshx2, Editor.tsby)]),
+        Collision.SOLID_BEAM_UPLEFT_PART_1: lambda wnd: pygame.draw.polygon(wnd.display, COLLISIONTEST_COLORS[CollisionTest.SOLID], [(Editor.tslx, Editor.tsty), (Editor.tshx1, Editor.tsty), (Editor.tsrx, Editor.tshy2), (Editor.tsrx, Editor.tsby)]),
+        Collision.SOLID_BEAM_UPLEFT_PART_2: lambda wnd: pygame.draw.polygon(wnd.display, COLLISIONTEST_COLORS[CollisionTest.SOLID], [(Editor.tslx, Editor.tsby), (Editor.tslx, Editor.tshy2), (Editor.tshx1 - 1, Editor.tsby)]),
     }
 
     def __init__(self, world_file, main_loop):
@@ -150,6 +163,7 @@ class Editor:
         self.main_loop = main_loop
         self.world_file = world_file
         self.bg_id_id = 0
+        self.terrain_layer = 0
         self.ts_id_id = 0
         self.ts_view_x = 0
         self.ts_view_y = 0
@@ -169,6 +183,7 @@ class Editor:
         self.collision_editor = 0
         self.screen_seg = main_loop.segment_window(0, 0, SCREEN_SIZE_W, SCREEN_SIZE_H)
         self.hide_objects_in_terrain_modes = False
+        self.only_render_current_layer = False
 
         self.sm_selection_1 = None
         self.sm_selection_2 = None
@@ -227,10 +242,41 @@ class Editor:
         if self.edited_world.background_music is None:
             self.edited_world.background_music = Audio.audio_by_name[list(Audio.audio_by_name)[0]]
 
-        self.controller = Controller(main_loop)
+        self.controller = Controller(main_loop, editor_control=True)
         self.controller.suspended = True
         self.controller.add_loaded_world(self.edited_world)
         self.controller.create_player()
+
+    def initialize_bossfight(self):
+        self.edited_world.bossfight_spec = (list(Boss.available_bosses)[0], list(self.edited_world.screens)[0], 0, 0)
+
+    def prev_boss_class(self):
+        bc = self.edited_world.bossfight_spec[0]
+        blist = list(Boss.available_bosses)
+        bidx = blist.index(bc)
+        bidx -= 1
+        if bidx < 0:
+            bidx = len(blist) - 1
+        bl = list(self.edited_world.bossfight_spec)
+        bl[0] = blist[bidx]
+        self.edited_world.bossfight_spec = tuple(bl)
+
+    def next_boss_class(self):
+        bc = self.edited_world.bossfight_spec[0]
+        blist = list(Boss.available_bosses)
+        bidx = blist.index(bc)
+        bidx += 1
+        if bidx >= len(blist):
+            bidx = 0
+        bl = list(self.edited_world.bossfight_spec)
+        bl[0] = blist[bidx]
+        self.edited_world.bossfight_spec = tuple(bl)
+
+    def set_bossfight_coords(self, x, y):
+        bl = list(self.edited_world.bossfight_spec)
+        bl[2] = x
+        bl[3] = y
+        self.edited_world.bossfight_spec = tuple(bl)
 
     def prev_music(self):
         audio_name = self.edited_world.background_music.audio_name
@@ -249,6 +295,32 @@ class Editor:
         if aidx >= len(alist):
             aidx = 0
         self.edited_world.background_music = Audio.audio_by_name[alist[aidx]]
+
+    def prev_tileset(self):
+        ts = self.edited_world.tileset.tileset_id
+        tlist = list(Tileset.tilesets)
+        tidx = tlist.index(ts)
+        tidx -= 1
+        if tidx < 0:
+            tidx = len(tlist) - 1
+        self.ts_id_id = tidx
+        self.ts_select_x = 0
+        self.ts_select_y = 0
+        self.edited_world.change_tileset(tlist[tidx])
+        self.tileset = self.edited_world.tileset
+
+    def next_tileset(self):
+        ts = self.edited_world.tileset.tileset_id
+        tlist = list(Tileset.tilesets)
+        tidx = tlist.index(ts)
+        tidx += 1
+        if tidx >= len(tlist):
+            tidx = 0
+        self.ts_id_id = tidx
+        self.ts_select_x = 0
+        self.ts_select_y = 0
+        self.edited_world.change_tileset(tlist[tidx])
+        self.tileset = self.edited_world.tileset
 
     def apply_tileset(self):
         self.edited_world.tileset = self.tileset
@@ -278,6 +350,8 @@ class Editor:
             "objects-passive": self.font.render("Objects", True, passive_color, 0),
             "object-list-active": self.font.render("Object List", True, active_color, 0),
             "object-list-passive": self.font.render("Object List", True, passive_color, 0),
+            "boss-active": self.font.render("Boss", True, active_color, 0),
+            "boss-passive": self.font.render("Boss", True, passive_color, 0),
             "simulation-active": self.font.render("Simulation", True, active_color, 0),
             "simulation-passive": self.font.render("Simulation", True, passive_color, 0),
             "framebyframe-active": self.font.render("Frame-by-frame", True, active_color, 0),
@@ -326,9 +400,10 @@ class Editor:
         wnd.display.blit(self.render_cache["selection-active"] if self.editing_mode == EditingMode.SELECTION else self.render_cache["selection-passive"], (1500, 360))
         wnd.display.blit(self.render_cache["objects-active"] if self.editing_mode == EditingMode.OBJECTS else self.render_cache["objects-passive"], (1500, 380))
         wnd.display.blit(self.render_cache["object-list-active"] if self.editing_mode == EditingMode.OBJECT_LIST else self.render_cache["object-list-passive"], (1500, 400))
-        pygame.draw.line(wnd.display, passive_color, (1500, 416), (1580, 416))
-        wnd.display.blit(self.render_cache["simulation-active"] if self.editing_mode == EditingMode.SIMULATION else self.render_cache["simulation-passive"], (1500, 420))
-        wnd.display.blit(self.render_cache["framebyframe-active"] if self.editing_mode == EditingMode.FRAMEBYFRAME else self.render_cache["framebyframe-passive"], (1500, 440))
+        wnd.display.blit(self.render_cache["boss-active"] if self.editing_mode == EditingMode.BOSS else self.render_cache["boss-passive"], (1500, 420))
+        pygame.draw.line(wnd.display, passive_color, (1500, 436), (1580, 436))
+        wnd.display.blit(self.render_cache["simulation-active"] if self.editing_mode == EditingMode.SIMULATION else self.render_cache["simulation-passive"], (1500, 440))
+        wnd.display.blit(self.render_cache["framebyframe-active"] if self.editing_mode == EditingMode.FRAMEBYFRAME else self.render_cache["framebyframe-passive"], (1500, 460))
 
         save_now_text = self.font.render("[Save now]", True, active_color, 0)
         wnd.display.blit(save_now_text, (1500, 728))
@@ -341,9 +416,18 @@ class Editor:
             fps_text = self.font.render("{0} FPS".format(self.main_loop.fps()), True, active_color, 0)
             self.render_cache[fpst] = fps_text
         wnd.display.blit(fps_text, (1540, 748))
+        dec_text = self.render_cache["dec"]
+        inc_text = self.render_cache["inc"]
+        decx_text = self.render_cache["decx"]
+        incx_text = self.render_cache["incx"]
+        decy_text = self.render_cache["decy"]
+        incy_text = self.render_cache["incy"]
 
         if self.editing_mode not in EditingModeLock:
-            self.edited_screen.render_to_window(self.screen_seg)
+            if self.editing_mode != EditingMode.TERRAIN or not self.only_render_current_layer:
+                self.edited_screen.render_to_window(self.screen_seg)
+            else:
+                self.edited_screen.render_to_window(self.screen_seg, layer=self.terrain_layer)
             if self.editing_mode == EditingMode.TERRAIN:
                 if not self.hide_objects_in_terrain_modes:
                     self.edited_screen.render_editor_objects(self.screen_seg)
@@ -354,6 +438,14 @@ class Editor:
                     tile_id_y = self.ts_select_y - self.ts_view_y
                     dest = pygame.Rect(Editor.ts_display_x + tile_id_x * Tileset.TILE_W, Editor.ts_display_y + tile_id_y * Tileset.TILE_H, Tileset.TILE_W, Tileset.TILE_H)
                     pygame.draw.rect(wnd.display, (255, 0, 0), dest, 1)
+                b_y = self.ts_display_y + Editor.ts_view_h * Tileset.TILE_H + 8
+                c_x = self.ts_display_x
+                for layer, label in LayerLabels.items():
+                    txt = self.font.render(label, True, active_color if self.terrain_layer == layer else passive_color, 0)
+                    wnd.display.blit(txt, (c_x, b_y))
+                    c_x += 50
+                orcr_txt = self.font.render("[Hide other layers]", True, active_color if self.only_render_current_layer else passive_color, 0)
+                wnd.display.blit(orcr_txt, (c_x, b_y))
             elif self.editing_mode == EditingMode.COLLISION:
                 if not self.hide_objects_in_terrain_modes:
                     self.edited_screen.render_editor_objects(self.screen_seg)
@@ -440,6 +532,27 @@ class Editor:
                             ed_obj.load_object_to_editor()
                         else:
                             self.objlist_selection_idx = None
+            elif self.editing_mode == EditingMode.BOSS:
+                if self.edited_world.bossfight_spec is None:
+                    self.initialize_bossfight()
+                bf_txt = self.font.render("Boss class: {0}".format(self.edited_world.bossfight_spec[0]), True, active_color, 0)
+                wnd.display.blit(bf_txt, (Editor.ts_display_x, Editor.ts_display_y))
+                wnd.display.blit(dec_text, (Editor.ts_display_x + 300, Editor.ts_display_y))
+                wnd.display.blit(inc_text, (Editor.ts_display_x + 320, Editor.ts_display_y))
+                bsid_txt = self.font.render("Boss screen ID: {0}".format(self.edited_world.bossfight_spec[1]), True, active_color, 0)
+                wnd.display.blit(bsid_txt, (Editor.ts_display_x, Editor.ts_display_y + 20))
+                uc_txt = self.font.render("[Use current]", True, active_color, 0)
+                wnd.display.blit(uc_txt, (Editor.ts_display_x + 300, Editor.ts_display_y + 20))
+                if self.edited_screen.screen_id == self.edited_world.bossfight_spec[1]:
+                    coord_txt = self.font.render("Boss coordinates: {0}, {1}".format(self.edited_world.bossfight_spec[2], self.edited_world.bossfight_spec[3]), True, active_color, 0)
+                    wnd.display.blit(coord_txt, (Editor.ts_display_x, Editor.ts_display_y + 40))
+                    wnd.display.blit(decx_text, (Editor.ts_display_x, Editor.ts_display_y + 60))
+                    wnd.display.blit(incx_text, (Editor.ts_display_x + 30, Editor.ts_display_y + 60))
+                    wnd.display.blit(decy_text, (Editor.ts_display_x + 60, Editor.ts_display_y + 60))
+                    wnd.display.blit(incy_text, (Editor.ts_display_x + 90, Editor.ts_display_y + 60))
+                    selpt_txt = self.font.render("[Select point]", True, active_color, 0)
+                    wnd.display.blit(selpt_txt, (Editor.ts_display_x + 120, Editor.ts_display_y + 60))
+                    pygame.draw.rect(self.screen_seg.display, (255, 255, 0), pygame.Rect(self.edited_world.bossfight_spec[2], self.edited_world.bossfight_spec[3], 72, 72), 1)
             if self.edited_world.starting_screen_id == self.edited_screen.screen_id:
                 self.controller.player.x = self.edited_world.start_x
                 self.controller.player.y = self.edited_world.start_y
@@ -452,8 +565,6 @@ class Editor:
             wnd.display.blit(scr_id_text, (1080, 320))
             e_tr = self.edited_screen.transitions[0]
             e_tr_text = self.font.render("East transition: {0}".format("solid" if e_tr == 0 else e_tr), True, (255, 255, 255), 0)
-            dec_text = self.render_cache["dec"]
-            inc_text = self.render_cache["inc"]
             wnd.display.blit(e_tr_text, (1080, 340))
             wnd.display.blit(dec_text, (1270, 340))
             wnd.display.blit(inc_text, (1290, 340))
@@ -512,8 +623,13 @@ class Editor:
             wnd.display.blit(dec_text, (1400, 560))
             wnd.display.blit(inc_text, (1420, 560))
 
+            wts_text = self.font.render("World tileset ID: {0}".format(self.edited_world.tileset.tileset_id), True, (255, 255, 255), 0)
+            wnd.display.blit(wts_text, (1080, 580))
+            wnd.display.blit(dec_text, (1400, 580))
+            wnd.display.blit(inc_text, (1420, 580))
+
             hoitm_text = self.font.render("[Hide objects in terrain modes]", True, active_color if self.hide_objects_in_terrain_modes else passive_color, 0)
-            wnd.display.blit(hoitm_text, (1080, 580))
+            wnd.display.blit(hoitm_text, (1080, 600))
 
             self.background.draw_to(160, 120, wnd.display, (1080, 640))
         else:
@@ -528,7 +644,7 @@ class Editor:
                 cx = x - self.sm_selection_1[0]
                 cy = y - self.sm_selection_1[1]
                 tile = self.edited_screen.tiles[y][x]
-                self.sm_clipboard[cy][cx] = (tile[0], tile[1], tile[2])
+                self.sm_clipboard[cy][cx] = tile
 
     def sm_cut(self):
         self.sm_to_clipboard()
@@ -548,7 +664,7 @@ class Editor:
                     wx = self.sm_selection_1[0] + xo
                     wy = self.sm_selection_1[1] + yo
                     src_tile = self.sm_clipboard[yo][xo]
-                    self.edited_screen.tiles[wy][wx] = (src_tile[0], src_tile[1], src_tile[2])
+                    self.edited_screen.tiles[wy][wx] = src_tile
                 except IndexError:
                     pass
         self.edited_screen.dirty = True
@@ -557,29 +673,25 @@ class Editor:
     def sm_terrain_fill(self):
         for x in range(self.sm_selection_1[0], self.sm_selection_2[0] + 1):
             for y in range(self.sm_selection_1[1], self.sm_selection_2[1] + 1):
-                tile = self.edited_screen.tiles[y][x]
-                self.edited_screen.tiles[y][x] = (self.ts_select_x, self.ts_select_y, tile[2])
+                self.edited_screen.change_tile_graphic(x, y, self.terrain_layer, self.ts_select_x, self.ts_select_y)
         self.edited_screen.dirty = True
 
     def sm_collision_fill(self):
         for x in range(self.sm_selection_1[0], self.sm_selection_2[0] + 1):
             for y in range(self.sm_selection_1[1], self.sm_selection_2[1] + 1):
-                tile = self.edited_screen.tiles[y][x]
-                self.edited_screen.tiles[y][x] = (tile[0], tile[1], self.collision_editor)
+                self.edited_screen.change_tile_collision(x, y, self.collision_editor)
         self.edited_screen.dirty_collisions = True
 
     def sm_terrain_reset(self):
         for x in range(self.sm_selection_1[0], self.sm_selection_2[0] + 1):
             for y in range(self.sm_selection_1[1], self.sm_selection_2[1] + 1):
-                tile = self.edited_screen.tiles[y][x]
-                self.edited_screen.tiles[y][x] = (0, 0, tile[2])
+                self.edited_screen.change_tile_graphic(x, y, self.terrain_layer, 0, 0)
         self.edited_screen.dirty = True
 
     def sm_collision_reset(self):
         for x in range(self.sm_selection_1[0], self.sm_selection_2[0] + 1):
             for y in range(self.sm_selection_1[1], self.sm_selection_2[1] + 1):
-                tile = self.edited_screen.tiles[y][x]
-                self.edited_screen.tiles[y][x] = (tile[0], tile[1], 0)
+                self.edited_screen.change_tile_collision(x, y, 0)
         self.edited_screen.dirty_collisions = True
 
     @staticmethod
@@ -624,11 +736,15 @@ class Editor:
                     self.exit_simulation_if_needed()
                     self.change_mode(EditingMode.OBJECTS)
                     return
-                elif event.pos[1] < 416:
+                elif event.pos[1] < 420:
                     self.exit_simulation_if_needed()
                     self.change_mode(EditingMode.OBJECT_LIST)
                     return
-                elif event.pos[1] < 440:
+                elif event.pos[1] < 436:
+                    self.exit_simulation_if_needed()
+                    self.change_mode(EditingMode.BOSS)
+                    return
+                elif event.pos[1] < 460:
                     if self.editing_mode not in SimulationModes:
                         self.exit_simulation_if_needed()
                         self.change_mode(EditingMode.SIMULATION)
@@ -637,7 +753,7 @@ class Editor:
                         self.change_mode(EditingMode.SIMULATION)
                         self.main_loop.suspend_ticking = False
                     return
-                elif event.pos[1] < 460:
+                elif event.pos[1] < 480:
                     if self.editing_mode not in SimulationModes:
                         self.exit_simulation_if_needed()
                         self.change_mode(EditingMode.FRAMEBYFRAME)
@@ -654,12 +770,24 @@ class Editor:
                 if self.point_selection_callback is not None:
                     return
                 if self.editing_mode == EditingMode.TERRAIN:
+                    b_y = self.ts_display_y + Editor.ts_view_h * Tileset.TILE_H + 8
+                    c_x = self.ts_display_x
                     if mousebox(event.pos[0], event.pos[1], Editor.ts_display_x, Editor.ts_display_y, Editor.ts_view_w * Tileset.TILE_W, Editor.ts_view_h * Tileset.TILE_H):
                         tx = int((event.pos[0] - Editor.ts_display_x) / Tileset.TILE_W) + self.ts_view_x
                         ty = int((event.pos[1] - Editor.ts_display_y) / Tileset.TILE_H) + self.ts_view_y
                         if tx < self.tileset.tiles_w and ty < self.tileset.tiles_h:
                             self.ts_select_x = tx
                             self.ts_select_y = ty
+                    elif mousebox(event.pos[0], event.pos[1], c_x, b_y, (len(LayerLabels) + 4) * 50, 20):
+                        for layer, label in LayerLabels.items():
+                            if event.pos[0] < c_x + 50:
+                                self.terrain_layer = int(layer)
+                                return
+                            else:
+                                c_x += 50
+                        if not self.locked[1]:
+                            self.locked[1] = True
+                            self.only_render_current_layer = not self.only_render_current_layer
                 elif self.editing_mode == EditingMode.COLLISION:
                     if not self.locked[1]:
                         if mousebox(event.pos[0], event.pos[1], Editor.ts_display_x + 48, Editor.ts_display_y + 76, 16, 16):
@@ -748,6 +876,49 @@ class Editor:
                             elif mousebox(event.pos[0], event.pos[1], Editor.ts_display_x, Editor.ts_display_y + 40, 500, 200):
                                 if ed_obj.__class__.check_object_editor_click(self, event.pos[0], event.pos[1], Editor.ts_display_x, Editor.ts_display_y + 40):
                                     self.locked[1] = True
+                elif self.editing_mode == EditingMode.BOSS and not self.locked[1]:
+                    dx = Editor.ts_display_x
+                    dy = Editor.ts_display_y
+                    if mousebox(event.pos[0], event.pos[1], dx, dy, 400, 80):
+                        if event.pos[1] < dy + 20:
+                            if event.pos[0] >= dx + 300:
+                                if event.pos[0] < dx + 320:
+                                    self.locked[1] = True
+                                    self.prev_boss_class()
+                                else:
+                                    self.locked[1] = True
+                                    self.next_boss_class()
+                        elif event.pos[1] < dy + 40:
+                            if event.pos[0] >= dx + 300:
+                                self.locked[1] = True
+                                ed = list(self.edited_world.bossfight_spec)
+                                ed[1] = self.edited_screen.screen_id
+                                self.edited_world.bossfight_spec = tuple(ed)
+                        elif event.pos[1] >= dy + 60 and self.edited_screen.screen_id == self.edited_world.bossfight_spec[1]:
+                            if event.pos[1] < dy + 80:
+                                if event.pos[0] < dx + 30:
+                                    self.locked[1] = True
+                                    ed = list(self.edited_world.bossfight_spec)
+                                    ed[2] -= 1
+                                    self.edited_world.bossfight_spec = tuple(ed)
+                                elif event.pos[0] < dx + 60:
+                                    self.locked[1] = True
+                                    ed = list(self.edited_world.bossfight_spec)
+                                    ed[2] += 1
+                                    self.edited_world.bossfight_spec = tuple(ed)
+                                elif event.pos[0] < dx + 90:
+                                    self.locked[1] = True
+                                    ed = list(self.edited_world.bossfight_spec)
+                                    ed[3] -= 1
+                                    self.edited_world.bossfight_spec = tuple(ed)
+                                elif event.pos[0] < dx + 120:
+                                    self.locked[1] = True
+                                    ed = list(self.edited_world.bossfight_spec)
+                                    ed[3] += 1
+                                    self.edited_world.bossfight_spec = tuple(ed)
+                                elif event.pos[0] < dx + 220:
+                                    self.locked[1] = True
+                                    self.point_selection_callback = self.set_bossfight_coords
                 if not self.locked[1]:
                     if mousebox(event.pos[0], event.pos[1], 1500, 728, 100, 20):
                         self.locked[1] = True
@@ -755,7 +926,7 @@ class Editor:
                     elif mousebox(event.pos[0], event.pos[1], 1080, 520, 100, 20):
                         self.locked[1] = True
                         self.edited_world.starting_screen_id = self.edited_screen.screen_id
-                    elif mousebox(event.pos[0], event.pos[1], 1080, 580, 100, 20):
+                    elif mousebox(event.pos[0], event.pos[1], 1080, 600, 100, 20):
                         self.locked[1] = True
                         self.hide_objects_in_terrain_modes = not self.hide_objects_in_terrain_modes
                     elif mousebox(event.pos[0], event.pos[1], 1270, 340, 40, 80):
@@ -818,6 +989,12 @@ class Editor:
                     elif mousebox(event.pos[0], event.pos[1], 1420, 560, 20, 20):
                         self.locked[1] = True
                         self.next_music()
+                    elif mousebox(event.pos[0], event.pos[1], 1400, 580, 20, 20):
+                        self.locked[1] = True
+                        self.prev_tileset()
+                    elif mousebox(event.pos[0], event.pos[1], 1420, 580, 20, 20):
+                        self.locked[1] = True
+                        self.next_tileset()
             elif event.pos[0] < SCREEN_SIZE_W:
                 if self.point_selection_callback is not None and event.button == 1:
                     self.point_selection_callback(event.pos[0], event.pos[1])
@@ -826,7 +1003,6 @@ class Editor:
                     return
                 sctx = int(event.pos[0] / Tileset.TILE_W)
                 scty = int(event.pos[1] / Tileset.TILE_H)
-                tile = self.edited_screen.tiles[scty][sctx]
                 if self.editing_mode == EditingMode.SELECTION:
                     if event.button == 3:
                         self.sm_selection_1 = None
@@ -848,15 +1024,15 @@ class Editor:
                             self.sm_selection_2 = (xmax, ymax)
                 elif self.editing_mode == EditingMode.TERRAIN:
                     if event.button == 1:
-                        self.edited_screen.tiles[scty][sctx] = (self.ts_select_x, self.ts_select_y, tile[2])
+                        self.edited_screen.change_tile_graphic(sctx, scty, self.terrain_layer, self.ts_select_x, self.ts_select_y)
                     elif event.button == 3:
-                        self.edited_screen.tiles[scty][sctx] = (0, 0, tile[2])
+                        self.edited_screen.change_tile_graphic(sctx, scty, self.terrain_layer, 0, 0)
                     self.edited_screen.dirty = True
                 elif self.editing_mode == EditingMode.COLLISION:
                     if event.button == 1:
-                        self.edited_screen.tiles[scty][sctx] = (tile[0], tile[1], self.collision_editor)
+                        self.edited_screen.change_tile_collision(sctx, scty, self.collision_editor)
                     elif event.button == 3:
-                        self.edited_screen.tiles[scty][sctx] = (tile[0], tile[1], 0)
+                        self.edited_screen.change_tile_collision(sctx, scty, 0)
                     self.edited_screen.dirty_collisions = True
                 elif self.editing_mode == EditingMode.OBJECTS:
                     if not self.locked[1]:
