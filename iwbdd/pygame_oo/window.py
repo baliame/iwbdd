@@ -1,6 +1,7 @@
 import pygame
-import OpenGL
+from OpenGL.GL import *
 import glfw
+from .framebuf import Framebuffer
 
 class Window:
     instance = None
@@ -17,6 +18,7 @@ class Window:
         #pygame.display.set_caption(title)
         self.vao = glGenVertexArray(1)
         glBindVertexArray(self.vao)
+        self.fbo = Framebuffer(w, h)
 
     def update(self):
         pygame.display.update()

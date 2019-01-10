@@ -33,3 +33,7 @@ class Program:
 
     def use(self):
         glUseProgram(self.prog)
+
+    def uniform_mat4(self, name, value):
+        u = glGetUniformLocation(self.prog, name)
+        glUniformMatrix4fv(u, 1, GL_FALSE, value)

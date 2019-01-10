@@ -17,7 +17,8 @@ setup(
     packages=find_packages(),
     install_requires=[
         "pygame",
-        "numpy"
+        "numpy",
+        "pyopengl"
     ],
     entry_points={
         'console_scripts': [
