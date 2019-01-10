@@ -1,6 +1,6 @@
 import pygame
-import pygame.display
-
+import OpenGL
+import glfw
 
 class Window:
     instance = None
@@ -12,8 +12,11 @@ class Window:
         self.y = 0
         self.w = w
         self.h = h
-        self.display = pygame.display.set_mode((w, h))
-        pygame.display.set_caption(title)
+        self.glw = glfw.create_window(w, h, title, None, None)
+        #self.display = pygame.display.set_mode((w, h), pygame.DOUBLEBUF | pygame.OPENGL)
+        #pygame.display.set_caption(title)
+        self.vao = glGenVertexArray(1)
+        glBindVertexArray(self.vao)
 
     def update(self):
         pygame.display.update()

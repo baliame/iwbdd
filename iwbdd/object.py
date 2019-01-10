@@ -80,6 +80,10 @@ class Object:
         self._state = ""
         self.animation_frame = 0
         self.time_accumulator = 0
+
+        self.SH_model_matrix = np.identity(4)
+        self.SH_colorize = (1.0, 1.0, 1.0, 1.0)
+
         self.last_sync_stamp = MainLoop.render_sync_stamp
         self.hitbox = None
         self.managed_hbds = False

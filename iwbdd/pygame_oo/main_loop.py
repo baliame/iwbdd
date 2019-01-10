@@ -1,4 +1,5 @@
 import pygame
+import glfw
 from pygame.locals import *
 from .window import WindowSection
 
@@ -31,8 +32,12 @@ class MainLoop:
         if self.was_init:
             raise RuntimeError("Duplicate initialization.")
 
+        if not glfw.init():
+            raise RuntimeError("GLFW initialization failed.")
+
         pygame.mixer.pre_init(44100, -16, 2, 512)
-        init = pygame.init()
+        init = [0, 0]
+
         if init[1] > 0:
             raise RuntimeError("{0} pygame modules failed to initialize.".format(init[1]))
 
