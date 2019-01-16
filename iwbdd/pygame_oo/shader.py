@@ -30,10 +30,15 @@ class Program:
         if glGetProgramiv(self.prog, GL_LINK_STATUS) != GL_TRUE:
             info = glGetProgramInfoLog(self.prog)
             raise RuntimeError('Failed to link program: %s' % info)
+        self.linked = True
 
     def use(self):
+        if not self.linked:
+            raise RuntimeError('Program must be linked before use.')
         glUseProgram(self.prog)
 
-    def uniform_mat4(self, name, value):
-        u = glGetUniformLocation(self.prog, name)
-        glUniformMatrix4fv(u, 1, GL_FALSE, value)
+    def __enter__(self):
+        self.use()
+
+    def __exit__(self, type, value, traceback):
+        glUseProgram(None)

@@ -5,7 +5,8 @@ import pygame
 from io import BytesIO
 import os.path as path
 from pygame.locals import BLEND_RGB_MULT
-
+from PIL import Image
+from .pygame_oo.texture import TextureSet2D
 
 # DATA FORMAT: (HEADER, [SPRITESHEETS])
 # HEADER: (<4> Number of spritesheets)
@@ -93,17 +94,22 @@ class Spritesheet:
         self.cell_h = struct.unpack('<L', eofc_read(reader, 4))[0]
         data_len = struct.unpack('<L', eofc_read(reader, 4))[0]
         raw_png = eofc_read(reader, data_len)
-        self.image_surface = pygame.image.load(BytesIO(raw_png)).convert_alpha()
-        self.variants[(None, 255, 1)] = self.image_surface
-
-    def check_applied_color(self):
-        if self.image_surface_colored is None or self.applied_color != self._applied_color:
-            self.image_surface_colored = self.image_surface.copy()
-            if self.applied_color is not None:
-                temp = pygame.Surface(self.image_surface_colored.get_size())
-                temp.fill(self.applied_color)
-                self.image_surface_colored.blit(temp, (0, 0), None, BLEND_RGB_MULT)
-            self._applied_color = self.applied_color
+        # self.image_surface = pygame.image.load(BytesIO(raw_png)).convert_alpha()
+        img_data = Image.open(BytesIO(raw_png)).transpose(Image.FLIP_TOP_BOTTOM)
+        xf = round(img_data.width / self.cell_w)
+        self.stride = xf
+        yf = round(img_data.height / self.cell_h)
+        self.tex = TextureSet2D(self.cell_w, self.cell_h, xf * yf)
+        with self.tex as t:
+            idx = 0
+            for y in range(yf):
+                sy = img_data.height - y * self.cell_h
+                for x in range(xf):
+                    sx = x * self.cell_w
+                    img = np.array(img_data.crop((sx, sy - self.cell_h, sx + self.cell_w, sy)).getdata(), dtype='u')
+                    t.set_image(idx, np.frombuffer(img.tobytes(), dtype=np.uint32))
+                    idx += 1
+        # self.variants[(None, 255, 1)] = self.image_surface
 
     def draw_cell_to(self, target, x, y, draw_x, draw_y):
         variant_scale = 1 / self.variant_downscale

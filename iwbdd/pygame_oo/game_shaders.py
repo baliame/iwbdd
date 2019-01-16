@@ -46,6 +46,32 @@ void main() {
 
 """.strip()
 
+GSH_pix_sheet = """
+#version 430
+
+layout(binding = 0) uniform sampler2DArray sprite;
+layout(binding = 1) uniform sampler2D screen;
+
+layout(location = 1) in vec2 in_uv;
+layout(location = 2) in vec2 in_screen_uv;
+
+layout(location = 0) out vec4 out_color;
+
+uniform vec4 colorize;
+uniform float tex_idx;
+
+void main() {
+    vec4 spr = texture(sprite, vec3(in_uv, tex_idx));
+    vec4 scr = texture(screen, in_screen_uv);
+
+    spr.a *= colorize.a;
+
+    vec3 clr = spr.a * spr.rgb + (1 - spr.a) * scr.rgb;
+    out_color = vec4(clr.rgb, 1);
+}
+
+""".strip()
+
 GSH_blit = """
 #version 430
 
@@ -61,8 +87,8 @@ void main() {
 }
 """.strip()
 
-_GSH_all = [(GL_VERTEX_SHADER, "GSH_vtx"), (GL_FRAGMENT_SHADER, "GSH_pix"), (GL_FRAGMENT_SHADER, "GSH_blit")]
-_GSH_progs = {"GSHP_render": {GL_VERTEX_SHADER: "GSH_vtx", GL_FRAGMENT_SHADER: "GSH_pix"}, "GSHP_blit": {GL_VERTEX_SHADER: "GSH_vtx", GL_FRAGMENT_SHADER: "GSH_blit"}}
+_GSH_all = [(GL_VERTEX_SHADER, "GSH_vtx"), (GL_FRAGMENT_SHADER, "GSH_pix"), (GL_FRAGMENT_SHADER, "GSH_pix_sheet"), (GL_FRAGMENT_SHADER, "GSH_blit")]
+_GSH_progs = {"GSHP_render": {GL_VERTEX_SHADER: "GSH_vtx", GL_FRAGMENT_SHADER: "GSH_pix"}, "GSHP_render_sheet": {GL_VERTEX_SHADER: "GSH_vtx", GL_FRAGMENT_SHADER: "GSH_pix_sheet"}, "GSHP_blit": {GL_VERTEX_SHADER: "GSH_vtx", GL_FRAGMENT_SHADER: "GSH_blit"}}
 GSH_compiled = {}
 GSH_programs = {}
 GSH_wasinit = False
@@ -83,3 +109,7 @@ def GSH_init():
         p.link()
         GSH_programs[prog] = p
     GSH_wasinit = True
+
+
+def GSH(prog):
+    return GSH_programs[prog]
