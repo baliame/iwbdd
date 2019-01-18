@@ -7,6 +7,7 @@ import os.path as path
 from pygame.locals import BLEND_RGB_MULT
 from PIL import Image
 from .pygame_oo.texture import TextureSet2D
+from .pygame_oo.game_shaders import GSH
 
 # DATA FORMAT: (HEADER, [SPRITESHEETS])
 # HEADER: (<4> Number of spritesheets)
