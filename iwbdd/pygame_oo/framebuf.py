@@ -1,7 +1,8 @@
 from OpenGL.GL import *
 from OpenGL.arrays.vbo import VBO
 import numpy as np
-from .game_shaders import GSH_programs
+from .game_shaders import GSH
+from .shader import Mat4
 from .texture import Texture2D
 
 
@@ -15,6 +16,7 @@ class Framebuffer:
         glBindFramebuffer(GL_FRAMEBUFFER, None)
         self.draw_arrays = VBO(np.array([0, 0, 1, 0, 0, 1, 1, 1], dtype='f'))
         self.uv_arrays = VBO(np.array([0, 0, 1, 0, 0, 1, 1, 1], dtype='f'))
+        self.identity = Mat4()
 
     def bind(self):
         glBindFramebuffer(GL_FRAMEBUFFER, self.fbid)
@@ -42,13 +44,13 @@ class Framebuffer:
 
     def blit_to_window(self):
         glBindFramebuffer(GL_FRAMEBUFFER, None)
-        GSH_programs["GSHP_blit"].use()
-        GSH_programs["GSHP_blit"].uniform_mat4("view", np.identity(4))
-        GSH_programs["GSHP_blit"].uniform_mat4("model", np.identity(4))
-        glEnableVertexAttribArray(0)
-        glEnableVertexAttribArray(1)
-        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, self.draw_arrays)
-        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, self.uv_arrays)
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
-        glDisableVertexAttribArray(0)
-        glDisableVertexAttribArray(1)
+        with GSH("GSHP_blit") as prog:
+            prog.uniform("view", self.identity)
+            prog.uniform("model", self.identity)
+            glEnableVertexAttribArray(0)
+            glEnableVertexAttribArray(1)
+            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, self.draw_arrays)
+            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, self.uv_arrays)
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
+            glDisableVertexAttribArray(0)
+            glDisableVertexAttribArray(1)

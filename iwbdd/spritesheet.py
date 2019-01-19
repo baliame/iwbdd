@@ -4,10 +4,13 @@ import struct
 import pygame
 from io import BytesIO
 import os.path as path
-from pygame.locals import BLEND_RGB_MULT
+# from pygame.locals import BLEND_RGB_MULT
 from PIL import Image
+from OpenGL.GL import *
 from .pygame_oo.texture import TextureSet2D
-from .pygame_oo.game_shaders import GSH
+from .pygame_oo.shader import Vec4, Mat4
+from .pygame_oo.game_shaders import GSHp
+from .pygame_oo.window import Window
 
 # DATA FORMAT: (HEADER, [SPRITESHEETS])
 # HEADER: (<4> Number of spritesheets)
@@ -66,26 +69,13 @@ class Spritesheet:
         self.variant_color = None
         self.variant_alpha = 255
         self.variant_downscale = 1
+        self.vec_buf = Vec4(1.0, 1.0, 1.0, 1.0)
+        self.stride = 0
+        self.model = Mat4()
+        self.draw_arrays = np.array([0, 0, 1, 0, 0, 1, 1, 1], dtype='f')
+        self.uv_arrays = np.array([0, 0, 1, 0, 0, 1, 1, 1], dtype='f')
         if reader is not None:
             self.read_spritesheet_data(reader)
-
-    def precache_variant(self, variant_color=None, variant_alpha=255, variant_downscale=1):
-        key = (variant_color, variant_alpha, variant_downscale)
-        if key in self.variants:
-            return
-        base = self.variants[(None, 255, 1)].copy()
-        if variant_color is not None:
-            temp = pygame.Surface(base.get_size())
-            temp.fill(variant_color)
-            base.blit(temp, (0, 0), None, BLEND_RGB_MULT)
-        if variant_alpha < 255:
-            sa = pygame.surfarray.pixels_alpha(base)
-            sa[sa > variant_alpha] = variant_alpha
-        if variant_downscale != 1:
-            src_size = base.get_size()
-            dest_size = (int(src_size[0] / variant_downscale), int(src_size[1] / variant_downscale))
-            base = pygame.transform.scale(base, dest_size)
-        self.variants[key] = base
 
     def read_spritesheet_data(self, reader):
         self.spritesheet_id = struct.unpack('<L', eofc_read(reader, 4))[0]
@@ -101,40 +91,58 @@ class Spritesheet:
         self.stride = xf
         yf = round(img_data.height / self.cell_h)
         self.tex = TextureSet2D(self.cell_w, self.cell_h, xf * yf)
+        self.draw_arrays = np.array([0, 0, self.cell_w, 0, 0, self.cell_h, self.cell_w, self.cell_h], dtype='f')
         with self.tex as t:
             idx = 0
             for y in range(yf):
                 sy = img_data.height - y * self.cell_h
                 for x in range(xf):
                     sx = x * self.cell_w
-                    img = np.array(img_data.crop((sx, sy - self.cell_h, sx + self.cell_w, sy)).getdata(), dtype='u')
+                    img = img_data.crop((sx, sy - self.cell_h, sx + self.cell_w, sy))
                     t.set_image(idx, np.frombuffer(img.tobytes(), dtype=np.uint32))
                     idx += 1
         # self.variants[(None, 255, 1)] = self.image_surface
 
     def draw_cell_to(self, target, x, y, draw_x, draw_y):
-        variant_scale = 1 / self.variant_downscale
-        variant_key = (self.variant_color, self.variant_alpha, self.variant_downscale)
-        if variant_key not in self.variants:
-            self.precache_variant(self.variant_color, self.variant_alpha, self.variant_downscale)
-        target.blit(self.variants[variant_key], (draw_x, draw_y), pygame.Rect(int(x * self.cell_w * variant_scale), int(y * self.cell_h * variant_scale), int(self.cell_w * variant_scale), int(self.cell_h * variant_scale)))
+        with GSHp('GSHP_render_sheet') as prog:
+            Window.instance.setup_render(prog)
+            render_loc = self.model * Mat4.translation(draw_x, draw_y)
+            self.vec_buf.load_rgb_a(self.variant_color, self.variant_alpha)
+            prog.uniform('colorize', self.vec_buf)
+            tex_idx = float(x + self.stride * y)
+            prog.uniform('tex_idx', tex_idx)
+            prog.uniform('model', render_loc)
+            self.tex.bindtexunit(0)
+            glEnableVertexAttribArray(0)
+            glEnableVertexAttribArray(1)
+            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, self.draw_arrays)
+            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, self.uv_arrays)
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
+            glDisableVertexAttribArray(0)
+            glDisableVertexAttribArray(1)
 
-    def make_hitbox(self, cell_x, cell_y, variant_downscale=1, alpha_threshold=1):
-        temp = self.variant_downscale
-        self.variant_downscale = variant_downscale
-        vs = 1 / variant_downscale
-        surf = pygame.Surface((int(self.cell_w * vs), int(self.cell_h * vs)), flags=pygame.SRCALPHA)
-        self.draw_cell_to(surf, cell_x, cell_y, 0, 0)
-        sa = pygame.surfarray.array_alpha(surf)
-        cond = np.nonzero(sa)
-        rmin = np.min(cond[0])
-        rmax = np.max(cond[0])
-        cmin = np.min(cond[1])
-        cmax = np.max(cond[1])
-        ox = -rmin
-        oy = -cmin
-        hitbox = sa[rmin:rmax, cmin:cmax]
-        hitbox[hitbox < alpha_threshold] = 0
-        hitbox[hitbox > 0] = 1
-        self.variant_scale = temp
-        return (hitbox, ox, oy)
+#        variant_scale = 1 / self.variant_downscale
+#        variant_key = (self.variant_color, self.variant_alpha, self.variant_downscale)
+#        if variant_key not in self.variants:
+#            self.precache_variant(self.variant_color, self.variant_alpha, self.variant_downscale)
+#        target.blit(self.variants[variant_key], (draw_x, draw_y), pygame.Rect(int(x * self.cell_w * variant_scale), int(y * self.cell_h * variant_scale), int(self.cell_w * variant_scale), int(self.cell_h * variant_scale)))
+
+#    def make_hitbox(self, cell_x, cell_y, variant_downscale=1, alpha_threshold=1):
+#        temp = self.variant_downscale
+#        self.variant_downscale = variant_downscale
+#        vs = 1 / variant_downscale
+#        surf = pygame.Surface((int(self.cell_w * vs), int(self.cell_h * vs)), flags=pygame.SRCALPHA)
+#        self.draw_cell_to(surf, cell_x, cell_y, 0, 0)
+#        sa = pygame.surfarray.array_alpha(surf)
+#        cond = np.nonzero(sa)
+#        rmin = np.min(cond[0])
+#        rmax = np.max(cond[0])
+#        cmin = np.min(cond[1])
+#        cmax = np.max(cond[1])
+#        ox = -rmin
+#        oy = -cmin
+#        hitbox = sa[rmin:rmax, cmin:cmax]
+#        hitbox[hitbox < alpha_threshold] = 0
+#        hitbox[hitbox > 0] = 1
+#        self.variant_scale = temp
+#        return (hitbox, ox, oy)
