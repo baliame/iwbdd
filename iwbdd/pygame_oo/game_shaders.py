@@ -12,11 +12,12 @@ layout(location = 2) out vec2 out_screen_uv;
 
 uniform mat4 view;
 uniform mat4 model;
+uniform float wscale, hscale;
 
 void main() {
     out_pos = view * model * vec4(in_pos, 0, 1);
     out_uv = in_uv;
-    out_screen_uv = out_pos.xy;
+    out_screen_uv = vec2(out_pos.x / wscale, out_pos.y / hscale);
 }
 
 """.strip()
@@ -112,4 +113,11 @@ def GSH_init():
 
 
 def GSH(prog):
-    return GSH_programs[prog]
+    p = GSH_programs[prog]
+    p.persistent = False
+    return p
+
+def GSHp(prog):
+    p = GSH_programs[prog]
+    p.persistent = True
+    return p
