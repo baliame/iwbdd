@@ -1,7 +1,45 @@
 import pygame
 import glfw
-from pygame.locals import *
 from .window import WindowSection
+import time
+
+
+class poevent:
+    @classmethod
+    def keydown(cls, key, scancode, mods):
+        ret = cls()
+        ret.key = key
+        ret.scancode = scancode
+        return ret
+
+    @classmethod
+    def motion(cls, x, y, buttons):
+        ret = cls()
+        ret.pos = [x, y]
+        ret.buttons = buttons[:]
+        return ret
+
+    @classmethod
+    def button(cls, x, y, button, action, mods):
+        ret = cls()
+        ret.pos = [x, y]
+        if button == glfw.MOUSE_BUTTON_LEFT:
+            ret.button = 1
+        elif button == glfw.MOUSE_BUTTON_MIDDLE:
+            ret.button = 2
+        elif button == glfw.MOUSE_BUTTON_RIGHT:
+            ret.button = 3
+        elif button == glfw.MOUSE_BUTTON_4:
+            ret.button = 4
+        elif button == glfw.MOUSE_BUTTON_5:
+            ret.button = 5
+        elif button == glfw.MOUSE_BUTTON_6:
+            ret.button = 6
+        elif button == glfw.MOUSE_BUTTON_7:
+            ret.button = 7
+        elif button == glfw.MOUSE_BUTTON_8:
+            ret.button = 8
+        return ret
 
 
 class MainLoop:
@@ -14,6 +52,7 @@ class MainLoop:
         MainLoop.instance = self
         self.was_init = False
         self.window = None
+        self.top_window = None
         self.suspend_ticking = False
         self.tickers = []
         self.updatables = []
@@ -25,8 +64,10 @@ class MainLoop:
         self.mouse_button_up_handler = None
         self.mouse_motion_handler = None
         self.prepare_exit = False
+        self.measured_fps = 0
         MainLoop.render_sync_stamp = 0
-        self.clock = pygame.time.Clock()
+        # self.clock = pygame.time.Clock()
+        self.mouse_buttons = [0, 0, 0, 0, 0, 0, 0, 0]
 
     def init(self):
         if self.was_init:
@@ -41,16 +82,12 @@ class MainLoop:
         if init[1] > 0:
             raise RuntimeError("{0} pygame modules failed to initialize.".format(init[1]))
 
-        init_font = pygame.font.init()
-        if init_font is not None:
-            raise RuntimeError("Pygame font failed to initialize: {0}".format(init_font))
-
-        MainLoop.render_sync_stamp = pygame.time.get_ticks() / 1000
+        MainLoop.render_sync_stamp = glfw.get_time()
 
         self.was_init = True
 
     def fps(self):
-        return int(self.clock.get_fps())
+        return self.measured_fps
 
     def break_main_loop(self):
         self.prepare_exit = True
@@ -66,9 +103,15 @@ class MainLoop:
         self.window = w
         self.updatables.append(w)
         w = w.get_parent()
+        v = w
         while w is not None:
+            v = w
             self.updatables.append(w)
             w = w.get_parent()
+        self.top_window = v
+        glfw.set_key_callback(v.glw, self.handle_key)
+        glfw.set_cursor_pos_callback(v.glw, self.handle_motion)
+        glfw.set_mouse_button_callback(v.glw, self.handle_button)
 
     def segment_window(self, x, y, w, h):
         if self.window is None:
@@ -89,41 +132,65 @@ class MainLoop:
     def set_blanket_keydown_handler(self, cb):
         self.blanket_keydown_handler = cb
 
+    def handle_key(self, wnd, key, scancode, action, mods):
+        if action == glfw.PRESS:
+            event = poevent.keydown(key, scancode, mods)
+            if self.blanket_keydown_handler is not None:
+                self.blanket_keydown_handler(event, self)
+            if event.key in self.keydown_handlers:
+                self.keydown_handlers[event.key](event, self)
+
     def set_mouse_button_handler(self, cb):
         self.mouse_button_handler = cb
 
     def set_mouse_button_up_handler(self, cb):
         self.mouse_button_up_handler = cb
 
+    def handle_button(self, wnd, button, action, mods):
+        if action == glfw.PRESS:
+            val = 1
+            cb = self.mouse_button_handler
+        elif action == glfw.RELEASE:
+            val = 0
+            cb = self.mouse_button_up_handler
+        else:
+            return
+
+        if button == glfw.MOUSE_BUTTON_LEFT:
+            self.mouse_buttons[0] = val
+        elif button == glfw.MOUSE_BUTTON_MIDDLE:
+            self.mouse_buttons[1] = val
+        elif button == glfw.MOUSE_BUTTON_RIGHT:
+            self.mouse_buttons[2] = val
+
+        x, y = glfw.get_cursor_pos(wnd)
+        event = poevent.button(x, y, button, action, mods)
+
+        if cb is not None:
+            cb(self.window.scale_event(event), self)
+
     def set_mouse_motion_handler(self, cb):
         self.mouse_motion_handler = cb
+
+    def handle_motion(self, wnd, x, y):
+        if self.mouse_motion_handler is not None:
+            event = poevent.motion(x, y, self.mouse_buttons)
+            self.mouse_motion_handler(self.window.scale_event(event), self)
 
     def add_atexit_callback(self, cb):
         self.atexit.append(cb)
 
     def start(self):
-        while True:
-            self.clock.tick(60)
-            for event in pygame.event.get():
-                if event.type == QUIT:
-                    self.break_main_loop()
-                elif event.type == KEYDOWN:
-                    if self.blanket_keydown_handler is not None:
-                        self.blanket_keydown_handler(event, self)
-                    if event.key in self.keydown_handlers:
-                        self.keydown_handlers[event.key](event, self)
-                elif event.type == MOUSEBUTTONDOWN and self.mouse_button_handler is not None:
-                    self.mouse_button_handler(self.window.scale_event(event), self)
-                elif event.type == MOUSEBUTTONUP and self.mouse_button_up_handler is not None:
-                    self.mouse_button_up_handler(self.window.scale_event(event), self)
-                elif event.type == MOUSEMOTION and self.mouse_motion_handler is not None:
-                    self.mouse_motion_handler(self.window.scale_event(event), self)
-            if self.prepare_exit:
-                for cb in self.atexit:
-                    cb(self)
-                break
+        spf = 1.0 / 60.0
+        last_time = glfw.get_time()
+        last_int = int(last_time)
+        temp_fps = 0
+        self.measured_fps = 0
+        while not glfw.window_should_close(self.top_window.glw):
+            #self.clock.tick(60)
+            glfw.poll_events()
             self.window.display.fill(0)
-            MainLoop.render_sync_stamp = pygame.time.get_ticks() / 1000
+            MainLoop.render_sync_stamp = glfw.get_time()
             if not self.suspend_ticking:
                 for ticker in self.tickers:
                     ticker(self)
@@ -131,3 +198,14 @@ class MainLoop:
                 renderer(self.window)
             for updatable in self.updatables:
                 updatable.update()
+            temp_fps += 1
+            while glfw.get_time() < last_time + spf:
+                time.sleep(0.001)
+            last_time += spf
+            curr_time = glfw.get_time()
+            if int(curr_time) > last_int:
+                last_int = int(curr_time)
+                self.measured_fps = temp_fps
+                temp_fps = 0
+        for cb in self.atexit:
+            cb(self)
