@@ -11,7 +11,7 @@ class Shader:
             glCompileShader(self.shader)
             if glGetShaderiv(self.shader, GL_COMPILE_STATUS) != GL_TRUE:
                 info = glGetShaderInfoLog(self.shader)
-                raise RuntimeError('Failed to compile shader: %s' % info)
+                raise RuntimeError('Failed to compile shader:\n{0}\n\nCODE:\n{1}'.format(info.decode('utf-8'), code))
         except:
             glDeleteShader(self.shader)
             raise
@@ -26,7 +26,7 @@ class Program:
         self.persistent = False
 
     def attach(self, shader):
-        if linked:
+        if self.linked:
             raise RuntimeError('Cannot attach shaders to linked program.')
         glAttachShader(self.prog, shader.shader)
 
@@ -48,6 +48,8 @@ class Program:
 
     def uniform(self, name, value, unsigned=False):
         loc = self.uniform_loc(name)
+        if value is None:
+            raise RuntimeError('Cannot assign None as value to uniform {0}'.format(name))
         try:
             value.uniform(loc)
         except AttributeError as e:
@@ -67,10 +69,11 @@ class Program:
     def __enter__(self):
         if not (self.persistent and Program.last_use == self):
             self.use()
+        return self
 
     def __exit__(self, type, value, traceback):
         if not self.persistent:
-            glUseProgram(None)
+            glUseProgram(0)
 
 
 class Vec4:
@@ -83,12 +86,14 @@ class Vec4:
 
     def __iadd__(self, v):
         self.data = np.array([self.data[0] + v.data[0], self.data[1] + v.data[1], self.data[2] + v.data[2], self.data[3] + v.data[3]], dtype=self.dtype)
+        return self
 
     def __mul__(self, v):
         return Vec4(self.data[0] * v.data[0], self.data[1] * v.data[1], self.data[2] * v.data[2], self.data[3] * v.data[3], self.dtype)
 
     def __imul__(self, v):
         self.data = np.array([self.data[0] * v.data[0], self.data[1] * v.data[1], self.data[2] * v.data[2], self.data[3] * v.data[3]], dtype=self.dtype)
+        return self
 
     def load_rgb(self, i):
         if i is None:
@@ -135,12 +140,12 @@ class Vec4:
         self.data[3] = a
 
     def uniform(self, loc):
-        if self.dtype == 'f' or self.dtype == float:
-            glUniform4fv(loc, self.data)
-        elif self.dtype == 'U':
-            glUniform4uiv(loc, self.data)
-        elif self.dtype == 'I':
-            glUniform4uiv(loc, self.data)
+        if self.dtype == 'f' or self.dtype == float or self.dtype == np.float:
+            glUniform4fv(loc, 1, self.data)
+        elif self.dtype == 'U' or self.dtype == np.uint32:
+            glUniform4uiv(loc, 1, self.data)
+        elif self.dtype == 'I' or self.dtype == np.int32:
+            glUniform4iv(loc, 1, self.data)
 
 
 class Mat4:
@@ -181,16 +186,19 @@ class Mat4:
 
     def __imul__(self, o):
         self.data = np.matmul(self.data, o.data)
-        return dest
+        return self
 
     def translate(self, x=0, y=0, z=0):
         self *= self.__class__.translation(x, y, z)
+        return self
 
     def rotate(self, angle=0):
         self *= self.__class__.rotation(angle)
+        return self
 
     def scale(self, x=1, y=1, z=1):
         self *= self.__class__.scaling(x, y, z)
+        return self
 
     def uniform(self, loc):
         glUniformMatrix4fv(loc, 1, False, self.data)

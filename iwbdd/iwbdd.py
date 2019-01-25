@@ -2,7 +2,6 @@ import os
 from shutil import copyfile
 from .pygame_oo.window import Window
 from .pygame_oo.main_loop import MainLoop
-from pygame.locals import *
 from .tileset import pack_tilesets_from_files, read_tilesets
 from .background import pack_backgrounds_from_files, read_backgrounds
 from .spritesheet import pack_spritesheets_from_files, read_spritesheets
@@ -12,13 +11,41 @@ from .object import Object
 from .bossfight import Bossfight, Boss
 from . import object_importer
 from .game import Controller
+from OpenGL.GL import *
+import glfw
 import time
 import sys
 import cProfile as profile
-
+from .pygame_oo.game_shaders import GSH_init
 
 def ml_exit_handler(event, ml):
     ml.break_main_loop()
+
+
+def opengl_tests_main():
+    m = MainLoop()
+    m.init()
+    w = Window(1008, 768, "IWBDD")
+    Object.enumerate_objects(Object)
+    Boss.enumerate_bosses()
+    m.set_window(w)
+    m.set_keydown_handler(glfw.KEY_ESCAPE, ml_exit_handler)
+    GSH_init()
+    read_tilesets("tilesets.tls")
+    read_backgrounds("backgrounds.bgs")
+    read_spritesheets("spritesheets.sss")
+    read_audio("audio.dat")
+
+    c = Controller(m)
+    c.load_world_from_file(sys.argv[1])
+    while glfw.get_key(w.glw, glfw.KEY_ESCAPE) != glfw.PRESS:
+        glClearColor(0.0, 0.0, 0.0, 1.0)
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+        c.current_screen.render_to_window(w)
+        w.fbo.blit_to_window()
+        glfw.swap_buffers(w.glw)
+        time.sleep(1)
+    m.quit()
 
 
 def main():
@@ -28,7 +55,7 @@ def main():
     Boss.enumerate_bosses()
     w = Window(1008, 768, "IWBDD")
     m.set_window(w)
-    m.set_keydown_handler(K_ESCAPE, ml_exit_handler)
+    m.set_keydown_handler(glfw.KEY_ESCAPE, ml_exit_handler)
 
     read_tilesets("tilesets.tls")
     read_backgrounds("backgrounds.bgs")

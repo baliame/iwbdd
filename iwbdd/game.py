@@ -7,7 +7,8 @@ import struct
 from .audio_data import Audio
 from collections import defaultdict
 from .savestate import Savestate
-import pygame
+from pygame import mixer
+import glfw
 from enum import IntEnum
 
 
@@ -26,6 +27,7 @@ class Controls(IntEnum):
     SHOOT = 3
     RESET = 4
     SKIP = 5
+    DEV1 = 16
 
 
 # 4 tiles = 96 px
@@ -57,12 +59,13 @@ class Controller:
     doublejump_strength = 0.8
     firing_cooldown = 10
     default_keybindings = {
-        Controls.LEFT: pygame.K_LEFT,
-        Controls.RIGHT: pygame.K_RIGHT,
-        Controls.JUMP: pygame.K_SPACE,
-        Controls.SHOOT: pygame.K_a,
-        Controls.RESET: pygame.K_r,
-        Controls.SKIP: pygame.K_s,
+        Controls.LEFT: glfw.KEY_LEFT,
+        Controls.RIGHT: glfw.KEY_RIGHT,
+        Controls.JUMP: glfw.KEY_SPACE,
+        Controls.SHOOT: glfw.KEY_A,
+        Controls.RESET: glfw.KEY_R,
+        Controls.SKIP: glfw.KEY_S,
+        Controls.DEV1: glfw.KEY_K,
     }
     movement_speed = 2
     default_music_volume = 0.8
@@ -95,12 +98,12 @@ class Controller:
         self.ml = main_loop
 
         self.music_volume = Controller.default_music_volume
-        pygame.mixer.set_num_channels(16)
-        pygame.mixer.set_reserved(3)
-        self.music_channel = pygame.mixer.Channel(0)
+        mixer.set_num_channels(16)
+        mixer.set_reserved(3)
+        self.music_channel = mixer.Channel(0)
         self.music_channel.set_volume(self.music_volume)
         self.curr_music = None
-        self.boss_channels = [pygame.mixer.Channel(1), pygame.mixer.Channel(2)]
+        self.boss_channels = [mixer.Channel(1), mixer.Channel(2)]
 
     def ambience(self, name):
         Audio.audio_by_name[name].play()
@@ -290,11 +293,13 @@ class Controller:
             return
         if self.player.dead:
             return
-        keys = pygame.key.get_pressed()
+        keys = defaultdict(bool)
+        for k, v in self.keybindings.items():
+            keys[v] = (self.ml.get_key(v) == glfw.PRESS)
         if self.bossfight is not None:
             if keys[self.keybindings[Controls.SKIP]]:
                 self.bossfight.skip()
-            if keys[pygame.K_k] and self.editor_controlled and self.bossfight.boss is not None and self.bossfight.state == 2 and not self.bossfight.boss.dead:
+            if keys[self.keybindings[Controls.DEV1]] and self.editor_controlled and self.bossfight.boss is not None and self.bossfight.state == 2 and not self.bossfight.boss.dead:
                 self.bossfight.boss.health -= 5
                 if self.bossfight.boss.health <= 0:
                     self.bossfight.boss.health = 1

@@ -6,8 +6,10 @@ from .tileset import Tileset
 from .common import eofc_read, is_reader_stream, CollisionTest, COLLISIONTEST_PREVENTS_MOVEMENT, SCREEN_SIZE_W, SCREEN_SIZE_H, COLLISIONTEST_COLORS
 from .object_importer import read_object
 from .object import ExistingSurfaceWrapper
+from .pygame_oo.texture import Texture2D
 import copy
-
+from OpenGL.GL import *
+import numpy as np
 
 class Collision(IntEnum):
     PASSABLE = 0
@@ -128,6 +130,7 @@ class Screen:
         self.gravity = (0, 0.4)
         self.jump_frames = 22
         self.objects_dirty = True
+        self.tileids = Texture2D(Screen.SCREEN_W, Screen.SCREEN_H, np.zeros((Screen.SCREEN_H, Screen.SCREEN_W), dtype=np.uint32), arr_type=GL_UNSIGNED_INT, arr_colors=GL_RED, magf=GL_NEAREST)
         if tile_data is not None:
             self.load_tile_data(tile_data)
 
@@ -335,47 +338,20 @@ class Screen:
             self.bound_objects[i].write_to_writer(target)
 
     def render_to_window(self, wnd, layer=None):
-        win_w = wnd.display.get_width()
-        win_h = wnd.display.get_height()
-        resizing = False
-        if self.pre_rendered is not None:
-            if (layer is None and self.pre_rendered_layer is not None) or (layer is not None and self.pre_rendered_layer is None) or (layer is not None and self.pre_rendered_layer is not None and layer != self.pre_rendered_layer):
-                self.dirty = True
-                self.pre_rendered_layer = layer
-            else:
-                pr_w = self.pre_rendered.get_width()
-                pr_h = self.pre_rendered.get_height()
-                if pr_w != win_w or pr_h != win_h:
-                    resizing = True
-        else:
-            pr_w = win_w
-            pr_h = win_h
-        if self.dirty or self.pre_rendered_unscaled is None:
-            if self.pre_rendered_unscaled is None:
-                self.pre_rendered_unscaled = pygame.Surface((SCREEN_SIZE_W, SCREEN_SIZE_H))
-            self.pre_rendered_unscaled.fill(0)
-            self.pre_rendered_unscaled.blit(self.background.image_surface, (0, 0))
+        if self.dirty:
+            tile_idx = np.zeros((Screen.SCREEN_H, Screen.SCREEN_W), dtype=np.uint32)
             for y in range(Screen.SCREEN_H):
                 for x in range(Screen.SCREEN_W):
-                    tile = self.tiles[y][x]
-                    if layer is None:
-                        layers_to_draw = LayerDrawOrder
-                    else:
-                        layers_to_draw = [layer]
-                    for l in layers_to_draw:
-                        xidx = int(l) * 2
-                        yidx = xidx + 1
-                        src_x = tile[xidx] * Tileset.TILE_W
-                        src_y = tile[yidx] * Tileset.TILE_H
-                        dest_x = x * Tileset.TILE_W
-                        dest_y = y * Tileset.TILE_H
-                        self.pre_rendered_unscaled.blit(self.world.tileset.image_surface, (dest_x, dest_y), pygame.Rect(src_x, src_y, Tileset.TILE_W, Tileset.TILE_H))
+                    tx, ty = (self.tiles[y][x][0], self.tiles[y][x][1])
+                    tile_idx[y][x] = self.world.tileset.stride * ty + tx
+            self.tileids.set_image(tile_idx, GL_UNSIGNED_INT, GL_RED)
             self.dirty = False
-            resizing = True
-        if resizing or self.pre_rendered is None:
-            self.pre_rendered = pygame.Surface((win_w, win_h))
-            pygame.transform.smoothscale(self.pre_rendered_unscaled, (win_w, win_h), self.pre_rendered)
-        wnd.display.blit(self.pre_rendered, (0, 0))
+        with wnd.fbo as fbo:
+            self.background.draw(0, 0, wnd.w, wnd.h)
+            fbo.new_render_pass()
+            fbo.bindtexunit(1)
+            self.tileids.bindtexunit(2)
+            self.world.tileset.draw_full_screen(0, 0, wnd.w, wnd.h)
 
     def render_objects(self, wnd):
         for obj in self.objects:

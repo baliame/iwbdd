@@ -2,7 +2,14 @@ from .common import eofc_read, lerp
 import struct
 import pygame
 from io import BytesIO
-
+from OpenGL.GL import *
+from PIL import Image
+from .pygame_oo.texture import Texture2D
+from .pygame_oo.game_shaders import GSHp
+from .pygame_oo.shader import Mat4
+from .pygame_oo.window import Window
+import numpy as np
+from OpenGL.arrays.vbo import VBO
 
 # DATA FORMAT: (HEADER, [BACKGROUND])
 # HEADER: (<4> Number of backgrounds)
@@ -34,6 +41,9 @@ class Background:
     draw_surface_w = 0
     draw_surface_h = 0
     err = (255, 255, 255)
+    identity = None
+    draw_arrays = None
+    uv_arrays = None
 
     @staticmethod
     def find(bid):
@@ -42,6 +52,10 @@ class Background:
         return None
 
     def __init__(self, reader=None):
+        if Background.identity is None:
+            Background.identity = Mat4()
+            Background.draw_arrays = VBO(np.array([0, 0, 1, 0, 0, 1, 1, 1], dtype='f'))
+            Background.uv_arrays = VBO(np.array([0, 0, 1, 0, 0, 1, 1, 1], dtype='f'))
         self.background_id = 0
         self.image_surface = None
         if reader is not None:
@@ -51,53 +65,20 @@ class Background:
         self.background_id = struct.unpack('<L', eofc_read(reader, 4))[0]
         data_len = struct.unpack('<L', eofc_read(reader, 4))[0]
         raw_png = eofc_read(reader, data_len)
-        self.image_surface = pygame.image.load(BytesIO(raw_png)).convert_alpha()
+        img_data = Image.open(BytesIO(raw_png)).transpose(Image.FLIP_TOP_BOTTOM)
+        bands = img_data.getbands()
+        self.tex = Texture2D(img_data.width, img_data.height, arr=np.frombuffer(img_data.tobytes(), dtype=np.uint8), arr_type=GL_UNSIGNED_BYTE, arr_colors=GL_RGB if len(bands) == 3 else GL_RGBA, dest_colors=GL_RGBA)
 
-    def ensureds(self, w, h):
-        if Background.draw_surface is None or Background.draw_surface_w != w or Background.draw_surface_h != h:
-            Background.draw_surface_w = w
-            Background.draw_surface_h = h
-            Background.draw_surface = pygame.Surface((w, h))
-            Background.draw_surface.fill(0)
-            pygame.transform.smoothscale(self.image_surface, (w, h), Background.draw_surface)
-
-    def draw_to(self, w, h, dest_surf, dest_area):
-        self.ensureds(w, h)
-        dest_surf.blit(Background.draw_surface, dest_area)
-
-    def sample(self, x, y, w, h):
-        x = int(x)
-        y = int(y)
-        self.ensureds(w, h)
-        sa = pygame.surfarray.pixels3d(Background.draw_surface)
-        try:
-            return (sa[x, y, 0], sa[x, y, 1], sa[x, y, 2])
-        except IndexError:
-            return Background.err
-
-    def bilerp(self, x, y, w, h):
-        ix = int(x)
-        iy = int(y)
-        xt = x - ix
-        yt = y - iy
-        if ix < 0 or iy < 0 or xt < 0 or yt < 0:
-            return (0, 0, 0)
-        self.ensureds(w, h)
-        sa = pygame.surfarray.pixels3d(Background.draw_surface)
-        try:
-            xy = (sa[ix, iy, 0], sa[ix, iy, 1], sa[ix, iy, 2])
-        except IndexError as e:
-            xy = Background.err
-        try:
-            x1y = (sa[ix + 1, iy, 0], sa[ix + 1, iy, 1], sa[ix + 1, iy, 2])
-        except IndexError as e:
-            x1y = Background.err
-        try:
-            xy1 = (sa[ix, iy + 1, 0], sa[ix, iy + 1, 1], sa[ix, iy + 1, 2])
-        except IndexError as e:
-            xy1 = Background.err
-        try:
-            x1y1 = (sa[ix + 1, iy + 1, 0], sa[ix + 1, iy + 1, 1], sa[ix + 1, iy + 1, 2])
-        except IndexError as e:
-            x1y1 = Background.err
-        return (lerp(lerp(xy[0], x1y[0], xt), lerp(xy1[0], x1y1[0], xt), yt), lerp(lerp(xy[1], x1y[1], xt), lerp(xy1[1], x1y1[1], xt), yt), lerp(lerp(xy[2], x1y[2], xt), lerp(xy1[2], x1y1[2], xt), yt))
+    def draw(self, x, y, w, h):
+        with GSHp("GSHP_blit") as prog:
+            Window.instance.setup_render(prog)
+            prog.uniform('model', Mat4.scaling(w, h, 0).translate(x, y))
+            self.tex.bindtexunit(1)
+            glEnableVertexAttribArray(0)
+            glEnableVertexAttribArray(1)
+            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, self.draw_arrays)
+            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, self.uv_arrays)
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
+            Window.instance.log_draw()
+            glDisableVertexAttribArray(0)
+            glDisableVertexAttribArray(1)

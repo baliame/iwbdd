@@ -1,6 +1,6 @@
 from .common import eofc_read
 import struct
-import pygame
+from pygame import mixer
 import tempfile
 import os.path
 from io import BytesIO
@@ -68,16 +68,13 @@ class Audio:
             print("Audio missing: {0}".format(name))
             return
         if channel is None:
-            channel = pygame.mixer.find_channel()
+            channel = mixer.find_channel()
         if channel is not None:
             channel.play(cls.audio_by_name[name].sound, loops=loops)
 
     def __init__(self, reader=None):
         self.audio_name = ""
         self.sound = None
-        # if Audio.audio_temp_dir is None:
-        #    Audio.audio_temp_dir = tempfile.TemporaryDirectory()
-        #    pygame.register_quit(Audio.cleanup_temp)
         if reader is not None:
             self.read_audio_data(reader)
 
@@ -86,15 +83,11 @@ class Audio:
         self.audio_name = eofc_read(reader, audio_name_len).decode('ascii')
         data_len = struct.unpack('<L', eofc_read(reader, 4))[0]
         raw_data = eofc_read(reader, data_len)
-        # temp_aud = os.path.join(Audio.audio_temp_dir.name, self.audio_name)
         temp_aud = BytesIO(raw_data)
-        # with open(temp_aud, 'wb') as f:
-        #     f.write(raw_data)
-        # self.sound = pygame.mixer.Sound(buffer=raw_data)
-        self.sound = pygame.mixer.Sound(file=temp_aud)
+        self.sound = mixer.Sound(file=temp_aud)
 
     def play(self, channel=None, loops=0):
         if channel is None:
-            channel = pygame.mixer.find_channel()
+            channel = mixer.find_channel()
         if channel is not None:
             channel.play(self.sound, loops=loops)

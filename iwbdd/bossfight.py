@@ -3,6 +3,7 @@ from .object import Object, ExplosionEffect, generate_rectangle_hitbox
 from .spritesheet import Spritesheet
 import copy
 import pygame
+import glfw
 from .audio_data import Audio
 from random import choice, randint
 from collections import OrderedDict
@@ -124,7 +125,7 @@ class Bossfight:
                     obj.activate_cutscene()
         self.ctrl.music(self.boss.intro_music)
         self.state = 1
-        self.last_call = pygame.time.get_ticks()
+        self.last_call = glfw.get_time() * 1000
 
     def _start_fight(self):
         if self.screen is not None:
@@ -145,7 +146,7 @@ class Bossfight:
                 self.start()
             return
         if self.state > 0:
-            curr_call = pygame.time.get_ticks()
+            curr_call = glfw.get_time() * 1000
             if self.state == 1:
                 self.ready_timer -= curr_call - self.last_call
                 if self.ready_timer <= 0:

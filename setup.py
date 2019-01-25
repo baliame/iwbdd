@@ -34,7 +34,8 @@ setup(
             'iwbdd_bossprof=iwbdd.iwbdd:profiled_boss',
             'iwbdd_editor=iwbdd.iwbdd:editor',
             'iwbdd_editor_w2=iwbdd.iwbdd:editor_w2',
-            'iwbdd_editor_scaled=iwbdd.iwbdd:editor_scaled'
+            'iwbdd_editor_scaled=iwbdd.iwbdd:editor_scaled',
+            'iwbdd_ogl=iwbdd.iwbdd:opengl_tests_main'
         ],
     }
 )

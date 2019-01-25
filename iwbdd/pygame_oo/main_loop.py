@@ -1,7 +1,8 @@
-import pygame
+from pygame import mixer
 import glfw
 from .window import WindowSection
 import time
+from OpenGL.GL import *
 
 
 class poevent:
@@ -66,7 +67,6 @@ class MainLoop:
         self.prepare_exit = False
         self.measured_fps = 0
         MainLoop.render_sync_stamp = 0
-        # self.clock = pygame.time.Clock()
         self.mouse_buttons = [0, 0, 0, 0, 0, 0, 0, 0]
 
     def init(self):
@@ -76,11 +76,7 @@ class MainLoop:
         if not glfw.init():
             raise RuntimeError("GLFW initialization failed.")
 
-        pygame.mixer.pre_init(44100, -16, 2, 512)
-        init = [0, 0]
-
-        if init[1] > 0:
-            raise RuntimeError("{0} pygame modules failed to initialize.".format(init[1]))
+        mixer.init(44100, -16, 2, 512)
 
         MainLoop.render_sync_stamp = glfw.get_time()
 
@@ -95,15 +91,15 @@ class MainLoop:
     def quit(self):
         if not self.was_init:
             raise RuntimeError("Quit before initialization.")
-        pygame.quit()
+        mixer.quit()
 
     def set_window(self, w):
         if self.window is not None:
             raise RuntimeError("Set multiple windows.")
         self.window = w
         self.updatables.append(w)
-        w = w.get_parent()
         v = w
+        w = w.get_parent()
         while w is not None:
             v = w
             self.updatables.append(w)
@@ -180,14 +176,16 @@ class MainLoop:
     def add_atexit_callback(self, cb):
         self.atexit.append(cb)
 
+    def get_key(self, key_const):
+        return glfw.get_key(self.top_window.glw, key_const)
+
     def start(self):
         spf = 1.0 / 60.0
         last_time = glfw.get_time()
         last_int = int(last_time)
         temp_fps = 0
         self.measured_fps = 0
-        while not glfw.window_should_close(self.top_window.glw):
-            #self.clock.tick(60)
+        while not glfw.window_should_close(self.top_window.glw) and not self.prepare_exit:
             glfw.poll_events()
             self.window.display.fill(0)
             MainLoop.render_sync_stamp = glfw.get_time()

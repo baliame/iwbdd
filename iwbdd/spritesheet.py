@@ -11,6 +11,7 @@ from .pygame_oo.texture import TextureSet2D
 from .pygame_oo.shader import Vec4, Mat4
 from .pygame_oo.game_shaders import GSHp
 from .pygame_oo.window import Window
+from OpenGL.arrays.vbo import VBO
 
 # DATA FORMAT: (HEADER, [SPRITESHEETS])
 # HEADER: (<4> Number of spritesheets)
@@ -72,8 +73,8 @@ class Spritesheet:
         self.vec_buf = Vec4(1.0, 1.0, 1.0, 1.0)
         self.stride = 0
         self.model = Mat4()
-        self.draw_arrays = np.array([0, 0, 1, 0, 0, 1, 1, 1], dtype='f')
-        self.uv_arrays = np.array([0, 0, 1, 0, 0, 1, 1, 1], dtype='f')
+        self.draw_arrays = VBO(np.array([0, 0, 1, 0, 0, 1, 1, 1], dtype='f'))
+        self.uv_arrays = VBO(np.array([0, 0, 1, 0, 0, 1, 1, 1], dtype='f'))
         if reader is not None:
             self.read_spritesheet_data(reader)
 
@@ -87,6 +88,7 @@ class Spritesheet:
         raw_png = eofc_read(reader, data_len)
         # self.image_surface = pygame.image.load(BytesIO(raw_png)).convert_alpha()
         img_data = Image.open(BytesIO(raw_png)).transpose(Image.FLIP_TOP_BOTTOM)
+        bands = img_data.getbands()
         xf = round(img_data.width / self.cell_w)
         self.stride = xf
         yf = round(img_data.height / self.cell_h)
@@ -99,7 +101,7 @@ class Spritesheet:
                 for x in range(xf):
                     sx = x * self.cell_w
                     img = img_data.crop((sx, sy - self.cell_h, sx + self.cell_w, sy))
-                    t.set_image(idx, np.frombuffer(img.tobytes(), dtype=np.uint32))
+                    t.set_image(idx, np.frombuffer(img.tobytes(), dtype=np.uint8), data_type=GL_UNSIGNED_BYTE, data_colors=GL_RGB if len(bands) == 3 else GL_RGBA)
                     idx += 1
         # self.variants[(None, 255, 1)] = self.image_surface
 
@@ -118,6 +120,7 @@ class Spritesheet:
             glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, self.draw_arrays)
             glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, self.uv_arrays)
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
+            Window.instance.log_draw()
             glDisableVertexAttribArray(0)
             glDisableVertexAttribArray(1)
 

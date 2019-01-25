@@ -44,6 +44,7 @@ class ActivatableLens(LensParent):
         self.offset_y = -2
 
     def generate_distortion(self):
+        return
         bg = self.screen.background
         basex = self.x + self.radius
         basey = self.y + self.radius
@@ -148,6 +149,7 @@ class MovingLens(LensParent):
         self.editor_drawing = False
 
     def generate_distortion(self):
+        return
         bg = self.screen.background
         basex = self.x + self.radius
         basey = self.y + self.radius

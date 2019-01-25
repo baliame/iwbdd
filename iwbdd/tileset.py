@@ -9,6 +9,7 @@ from .pygame_oo.shader import Mat4, Vec4
 from .pygame_oo.game_shaders import GSHp
 from .pygame_oo.window import Window
 from OpenGL.GL import *
+from OpenGL.arrays.vbo import VBO
 
 
 # DATA FORMAT: (HEADER, [TILESETS])
@@ -58,8 +59,8 @@ class Tileset:
         self.stride = 0
         self.vec_buf = Vec4(1.0, 1.0, 1.0, 1.0)
         self.model = Mat4()
-        self.draw_arrays = np.array([0, 0, Tileset.TILE_W, 0, 0, Tileset.TILE_H, Tileset.TILE_W, Tileset.TILE_H], dtype='f')
-        self.uv_arrays = np.array([0, 0, 1, 0, 0, 1, 1, 1], dtype='f')
+        self.draw_arrays = VBO(np.array([0, 0, Tileset.TILE_W, 0, 0, Tileset.TILE_H, Tileset.TILE_W, Tileset.TILE_H], dtype='f'))
+        self.uv_arrays = VBO(np.array([0, 0, 1, 0, 0, 1, 1, 1], dtype='f'))
         if reader is not None:
             self.read_tileset_data(reader)
 
@@ -68,25 +69,24 @@ class Tileset:
         data_len = struct.unpack('<L', eofc_read(reader, 4))[0]
         raw_png = eofc_read(reader, data_len)
         img_data = Image.open(BytesIO(raw_png)).transpose(Image.FLIP_TOP_BOTTOM)
+        bands = img_data.getbands()
         self.tiles_w = round(img_data.width / Tileset.TILE_W)
         self.tiles_h = round(img_data.height / Tileset.TILE_H)
 
-        # self.image_surface = pygame.image.load(BytesIO(raw_png)).convert_alpha()
         xf = self.tiles_w
         self.stride = xf
         yf = self.tiles_h
-        self.tex = TextureSet2D(Tileset.TILE_W, self.cell_h, xf * yf)
+        self.tex = TextureSet2D(Tileset.TILE_W, Tileset.TILE_H, xf * yf)
         with self.tex as t:
             idx = 0
             for y in range(yf):
-                sy = img_data.height - y * self.cell_h
+                sy = img_data.height - y * Tileset.TILE_H
                 for x in range(xf):
-                    sx = x * self.cell_w
-                    img = img_data.crop((sx, sy - Tileset.TILE_H, sx + Tileset.TILE_H, sy))
-                    t.set_image(idx, np.frombuffer(img.tobytes(), dtype=np.uint32))
+                    sx = x * Tileset.TILE_W
+                    img = img_data.crop((sx, sy, sx + Tileset.TILE_W, sy + Tileset.TILE_H))
+                    t.set_image(idx, np.frombuffer(img.tobytes(), dtype=np.uint8), data_colors=GL_RGB if len(bands) == 3 else GL_RGBA, data_type=GL_UNSIGNED_BYTE)
                     idx += 1
 
-    # def draw_to(self, tiles_x, tiles_y, tiles_w, tiles_h, dest_surf, dest_area):
     def draw_to(self, x, y, draw_x, draw_y):
         with GSHp('GSHP_render_sheet') as prog:
             Window.instance.setup_render(prog)
@@ -101,16 +101,23 @@ class Tileset:
             glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, self.draw_arrays)
             glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, self.uv_arrays)
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
+            Window.instance.log_draw()
             glDisableVertexAttribArray(0)
             glDisableVertexAttribArray(1)
-#        if Tileset.draw_surface is None or Tileset.draw_surface_w != tiles_w or Tileset.draw_surface_h != tiles_h:
-#            Tileset.draw_surface_w = tiles_w
-#            Tileset.draw_surface_h = tiles_h
-#            Tileset.draw_surface = pygame.Surface((tiles_w * Tileset.TILE_W, tiles_h * Tileset.TILE_H))
-#        Tileset.draw_surface.fill(0)
-#        if tiles_x + tiles_w > self.tiles_w:
-#            tiles_w = self.tiles_w - tiles_x
-#        if tiles_y + tiles_h > self.tiles_h:
-#            tiles_h = self.tiles_h - tiles_y
-#        Tileset.draw_surface.blit(self.image_surface, (0, 0), pygame.Rect(tiles_x * Tileset.TILE_W, tiles_y * Tileset.TILE_H, (tiles_x + tiles_w) * Tileset.TILE_W, (tiles_y + tiles_h) * Tileset.TILE_H))
-#        dest_surf.blit(Tileset.draw_surface, dest_area)
+
+    def draw_full_screen(self, x, y, draw_w, draw_h):
+        with GSHp('GSHP_render_terrain') as prog:
+            Window.instance.setup_render(prog)
+            prog.uniform('model', Mat4())
+            prog.uniform('tile_w', float(Tileset.TILE_W))
+            prog.uniform('tile_w', float(Tileset.TILE_H))
+            prog.uniform('colorize', self.vec_buf)
+            self.tex.bindtexunit(0)
+            glEnableVertexAttribArray(0)
+            glEnableVertexAttribArray(1)
+            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, VBO(np.array([0, 0, draw_w, 0, draw_w, draw_h, 0, draw_h], dtype='f')))
+            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, self.uv_arrays)
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
+            Window.instance.log_draw()
+            glDisableVertexAttribArray(0)
+            glDisableVertexAttribArray(1)
