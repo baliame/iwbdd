@@ -18,14 +18,17 @@ setup(
     install_requires=[
         "pygame",
         "numpy",
-        "pyopengl"
+        "pyopengl",
+        "pillow",
+        "glfw"
     ],
     entry_points={
         'console_scripts': [
             'iwbdd_tsp=iwbdd.iwbdd:pack_tilesets',
             'iwbdd_bgp=iwbdd.iwbdd:pack_backgrounds',
             'iwbdd_ssp=iwbdd.iwbdd:pack_spritesheets',
-            'iwbdd_adp=iwbdd.iwbdd:pack_audio'
+            'iwbdd_adp=iwbdd.iwbdd:pack_audio',
+            'iwbdd_ogl=iwbdd.iwbdd:opengl_tests_main'
         ],
         'gui_scripts': [
             'iwbdd=iwbdd.iwbdd:main',
@@ -35,7 +38,6 @@ setup(
             'iwbdd_editor=iwbdd.iwbdd:editor',
             'iwbdd_editor_w2=iwbdd.iwbdd:editor_w2',
             'iwbdd_editor_scaled=iwbdd.iwbdd:editor_scaled',
-            'iwbdd_ogl=iwbdd.iwbdd:opengl_tests_main'
         ],
     }
 )

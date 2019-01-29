@@ -17,12 +17,14 @@ import time
 import sys
 import cProfile as profile
 from .pygame_oo.game_shaders import GSH_init
+import faulthandler
 
 def ml_exit_handler(event, ml):
     ml.break_main_loop()
 
 
 def opengl_tests_main():
+    faulthandler.enable()
     m = MainLoop()
     m.init()
     w = Window(1008, 768, "IWBDD")
@@ -41,10 +43,15 @@ def opengl_tests_main():
     while glfw.get_key(w.glw, glfw.KEY_ESCAPE) != glfw.PRESS:
         glClearColor(0.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+        w.fbo.new_render_pass(True)
         c.current_screen.render_to_window(w)
+        # w.fbo.bind()
+        # fb_data = glReadPixels(0, 0, 1008, 768, GL_RGBA, GL_UNSIGNED_BYTE)
+        # print(fb_data)
+        # w.fbo.unbind()
         w.fbo.blit_to_window()
         glfw.swap_buffers(w.glw)
-        time.sleep(1)
+        time.sleep(0.02)
     m.quit()
 
 

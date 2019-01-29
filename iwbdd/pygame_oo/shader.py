@@ -1,6 +1,7 @@
 from OpenGL.GL import *
 import numpy as np
 from math import sin, cos
+from . import logger
 
 
 class Shader:
@@ -51,14 +52,17 @@ class Program:
         if value is None:
             raise RuntimeError('Cannot assign None as value to uniform {0}'.format(name))
         try:
-            value.uniform(loc)
+            value.uniform(loc, name)
         except AttributeError as e:
             if isinstance(value, float):
+                logger.log_uniform(name, value, 'float')
                 glUniform1f(loc, value)
             elif isinstance(value, int):
                 if unsigned:
+                    logger.log_uniform(name, value, 'unsigned int')
                     glUniform1ui(loc, value)
                 else:
+                    logger.log_uniform(name, value, 'int')
                     glUniform1i(loc, value)
             else:
                 raise ValueError('Cannot deduce uniform type, call glUniform directly.')
@@ -139,12 +143,15 @@ class Vec4:
         self.data[2] = b
         self.data[3] = a
 
-    def uniform(self, loc):
+    def uniform(self, loc, name):
         if self.dtype == 'f' or self.dtype == float or self.dtype == np.float:
+            logger.log_uniform(name, self.data, 'float vector')
             glUniform4fv(loc, 1, self.data)
         elif self.dtype == 'U' or self.dtype == np.uint32:
+            logger.log_uniform(name, self.data, 'unsigned vector')
             glUniform4uiv(loc, 1, self.data)
         elif self.dtype == 'I' or self.dtype == np.int32:
+            logger.log_uniform(name, self.data, 'int vector')
             glUniform4iv(loc, 1, self.data)
 
 
@@ -155,9 +162,12 @@ class Mat4:
     @classmethod
     def translation(cls, x=0, y=0, z=0):
         ret = cls()
-        ret.data[0, 3] = x
-        ret.data[1, 3] = y
-        ret.data[2, 3] = z
+        # ret.data[0, 3] = x
+        # ret.data[1, 3] = y
+        # ret.data[2, 3] = z
+        ret.data[3, 0] = x
+        ret.data[3, 1] = y
+        ret.data[3, 2] = z
         return ret
 
     @classmethod
@@ -200,5 +210,6 @@ class Mat4:
         self *= self.__class__.scaling(x, y, z)
         return self
 
-    def uniform(self, loc):
+    def uniform(self, loc, name):
+        logger.log_uniform(name, self.data, '4x4 float matrix')
         glUniformMatrix4fv(loc, 1, False, self.data)

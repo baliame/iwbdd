@@ -8,6 +8,7 @@ from .pygame_oo.texture import TextureSet2D
 from .pygame_oo.shader import Mat4, Vec4
 from .pygame_oo.game_shaders import GSHp
 from .pygame_oo.window import Window
+from .pygame_oo import logger
 from OpenGL.GL import *
 from OpenGL.arrays.vbo import VBO
 
@@ -61,6 +62,7 @@ class Tileset:
         self.model = Mat4()
         self.draw_arrays = VBO(np.array([0, 0, Tileset.TILE_W, 0, 0, Tileset.TILE_H, Tileset.TILE_W, Tileset.TILE_H], dtype='f'))
         self.uv_arrays = VBO(np.array([0, 0, 1, 0, 0, 1, 1, 1], dtype='f'))
+        self.wh_arrays = VBO(np.array([0, 0, 1, 0, 0, 2, 1, 2], dtype='f'))
         if reader is not None:
             self.read_tileset_data(reader)
 
@@ -98,10 +100,12 @@ class Tileset:
             self.tex.bindtexunit(0)
             glEnableVertexAttribArray(0)
             glEnableVertexAttribArray(1)
+            self.draw_arrays.bind()
             glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, self.draw_arrays)
+            self.uv_arrays.bind()
             glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, self.uv_arrays)
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
-            Window.instance.log_draw()
+            logger.log_draw()
             glDisableVertexAttribArray(0)
             glDisableVertexAttribArray(1)
 
@@ -110,14 +114,17 @@ class Tileset:
             Window.instance.setup_render(prog)
             prog.uniform('model', Mat4())
             prog.uniform('tile_w', float(Tileset.TILE_W))
-            prog.uniform('tile_w', float(Tileset.TILE_H))
+            prog.uniform('tile_h', float(Tileset.TILE_H))
             prog.uniform('colorize', self.vec_buf)
             self.tex.bindtexunit(0)
             glEnableVertexAttribArray(0)
             glEnableVertexAttribArray(1)
-            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, VBO(np.array([0, 0, draw_w, 0, draw_w, draw_h, 0, draw_h], dtype='f')))
-            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, self.uv_arrays)
+            self.wh_arrays[:] = np.array([0, 0, draw_w, 0, 0, draw_h, draw_w, draw_h], dtype='f')
+            self.wh_arrays.bind()
+            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, self.wh_arrays)
+            self.uv_arrays.bind()
+            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, self.uv_arrays)
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
-            Window.instance.log_draw()
+            logger.log_draw()
             glDisableVertexAttribArray(0)
             glDisableVertexAttribArray(1)

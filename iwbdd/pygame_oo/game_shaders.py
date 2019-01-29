@@ -1,5 +1,6 @@
 from .shader import Shader, Program
 from OpenGL.GL import *
+from . import logger
 
 GSH_vtx = """
 #version 430
@@ -20,6 +21,7 @@ void main() {
     out_uv = in_uv;
     out_screen_uv = vec2(out_pos.x / wscale, out_pos.y / hscale);
     out_screen_pos = (model * vec4(in_pos, 0, 1)).xy;
+    gl_Position = out_pos;
 }
 
 """.strip()
@@ -110,7 +112,6 @@ GSH_blit = """
 layout(binding = 1) uniform sampler2D screen;
 
 layout(location = 1) in vec2 in_uv;
-layout(location = 2) in vec2 in_screen_uv;
 
 layout(location = 0) out vec4 out_color;
 

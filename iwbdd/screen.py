@@ -345,10 +345,10 @@ class Screen:
                     tx, ty = (self.tiles[y][x][0], self.tiles[y][x][1])
                     tile_idx[y][x] = self.world.tileset.stride * ty + tx
             self.tileids.set_image(tile_idx, GL_UNSIGNED_INT, GL_RED)
+            print(tile_idx)
             self.dirty = False
         with wnd.fbo as fbo:
             self.background.draw(0, 0, wnd.w, wnd.h)
-            fbo.new_render_pass()
             fbo.bindtexunit(1)
             self.tileids.bindtexunit(2)
             self.world.tileset.draw_full_screen(0, 0, wnd.w, wnd.h)

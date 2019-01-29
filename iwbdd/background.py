@@ -6,8 +6,9 @@ from OpenGL.GL import *
 from PIL import Image
 from .pygame_oo.texture import Texture2D
 from .pygame_oo.game_shaders import GSHp
-from .pygame_oo.shader import Mat4
+from .pygame_oo.shader import Mat4, Vec4
 from .pygame_oo.window import Window
+from .pygame_oo import logger
 import numpy as np
 from OpenGL.arrays.vbo import VBO
 
@@ -72,13 +73,16 @@ class Background:
     def draw(self, x, y, w, h):
         with GSHp("GSHP_blit") as prog:
             Window.instance.setup_render(prog)
-            prog.uniform('model', Mat4.scaling(w, h, 0).translate(x, y))
+            prog.uniform('model', Mat4.scaling(w, h, 1))
+            prog.uniform('colorize', Vec4(1.0, 1.0, 1.0, 1.0))
             self.tex.bindtexunit(1)
             glEnableVertexAttribArray(0)
             glEnableVertexAttribArray(1)
+            self.draw_arrays.bind()
             glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, self.draw_arrays)
-            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, self.uv_arrays)
+            self.uv_arrays.bind()
+            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, self.uv_arrays)
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
-            Window.instance.log_draw()
+            logger.log_draw()
             glDisableVertexAttribArray(0)
             glDisableVertexAttribArray(1)

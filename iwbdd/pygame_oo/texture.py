@@ -53,7 +53,7 @@ class Texture2D:
 
     def clear(self):
         glBindTexture(GL_TEXTURE_2D, self.texid)
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, self.w, self.h, 0, GL_RGBA, GL_FLOAT, np.ones(self.w * self.h * 4, color, dtype=np.float))
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, self.w, self.h, 0, GL_RGBA, GL_FLOAT, np.ones(self.w * self.h * 4, dtype=np.float))
         glBindTexture(GL_TEXTURE_2D, 0)
 
 

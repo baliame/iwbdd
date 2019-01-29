@@ -4,6 +4,7 @@ import glfw
 from .framebuf import Framebuffer
 from .shader import Mat4
 
+
 class Window:
     instance = None
     enable_log = True
@@ -30,20 +31,10 @@ class Window:
         self.vao = glGenVertexArrays(1)
         glBindVertexArray(self.vao)
         self.fbo = Framebuffer(w, h, self, name='Window alpha buffer')
-        self.view = Mat4.scaling(1.0 / w, 1.0 / h, 1)
+        self.view = Mat4.scaling(2.0 / w, 2.0 / h, 1).translate(-1, -1)
 
     def update(self):
         pygame.display.update()
-
-    def log_draw(self):
-        if not enable_log:
-            return
-        print('DRAW: did draw with {0}'.format('no bound framebuffer' if Framebuffer.bound is None else 'framebuffer named "{0}"'.format(Framebuffer.bound.fbo_name)))
-
-    def log_read_copy(self, fbo_name):
-        if not enable_log:
-            return
-        print('PASS: new render pass, copied transparency in framebuffer named "{0}"'.format(fbo_name))
 
     def get_parent(self):
         return None

@@ -12,6 +12,7 @@ from .pygame_oo.shader import Vec4, Mat4
 from .pygame_oo.game_shaders import GSHp
 from .pygame_oo.window import Window
 from OpenGL.arrays.vbo import VBO
+from .pygame_oo import logger
 
 # DATA FORMAT: (HEADER, [SPRITESHEETS])
 # HEADER: (<4> Number of spritesheets)
@@ -117,10 +118,12 @@ class Spritesheet:
             self.tex.bindtexunit(0)
             glEnableVertexAttribArray(0)
             glEnableVertexAttribArray(1)
+            self.draw_arrays.bind()
             glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, self.draw_arrays)
-            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, self.uv_arrays)
+            self.uv_arrays.bind()
+            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, self.uv_arrays)
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
-            Window.instance.log_draw()
+            logger.log_draw()
             glDisableVertexAttribArray(0)
             glDisableVertexAttribArray(1)
 
