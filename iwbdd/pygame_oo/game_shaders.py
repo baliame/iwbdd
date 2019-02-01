@@ -14,12 +14,11 @@ layout(location = 3) out vec2 out_screen_pos;
 
 uniform mat4 view;
 uniform mat4 model;
-uniform float wscale, hscale;
 
 void main() {
     out_pos = view * model * vec4(in_pos, 0, 1);
     out_uv = in_uv;
-    out_screen_uv = vec2(out_pos.x / wscale, out_pos.y / hscale);
+    out_screen_uv = vec2((out_pos.x + 1) / 2, (out_pos.y + 1) / 2);
     out_screen_pos = (model * vec4(in_pos, 0, 1)).xy;
     gl_Position = out_pos;
 }
@@ -82,7 +81,7 @@ GSH_pix_terrain = """
 
 layout(binding = 0) uniform sampler2DArray tileset;
 layout(binding = 1) uniform sampler2D screen;
-layout(binding = 2) uniform sampler2D tile_idx;
+layout(binding = 2) uniform usampler2D tile_idx;
 
 layout(location = 1) in vec2 in_uv;
 layout(location = 2) in vec2 in_screen_uv;
@@ -94,7 +93,17 @@ uniform vec4 colorize;
 uniform float tile_w, tile_h;
 
 void main() {
-    float tex_idx = texture(tile_idx, vec2(in_screen_pos.x / tile_w, in_screen_pos.y / tile_h)).r;
+    // out_color = vec4(in_screen_pos.x / (tile_w * 42), in_screen_pos.y / (tile_h * 32), 0, 1);
+    // return;
+
+    // float tex_idx = float(texelFetch(tile_idx, ivec2(41, 31), 0).r);
+    uvec4 tex_idxu = texelFetch(tile_idx, ivec2(int(in_screen_pos.x / tile_w), int(in_screen_pos.y / tile_h)), 0);
+    float tex_idx = float(tex_idxu.r);
+    // float tex_idx = texture(tile_idx, vec2(in_screen_pos.x / tile_w, in_screen_pos.y / tile_h)).r;
+
+    out_color = vec4(vec3(tex_idxu.rgb), 1);
+    return;
+
     vec4 spr = texture(tileset, vec3(in_uv, tex_idx));
     vec4 scr = texture(screen, in_screen_uv);
 

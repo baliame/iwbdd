@@ -34,9 +34,17 @@ class Texture2D:
     def bind(self):
         self.bindtexunit()
 
-    def set_image(self, data, data_type=GL_UNSIGNED_INT, data_colors=GL_RGBA):
+    def set_image(self, data, data_type=GL_UNSIGNED_INT, data_colors=GL_RGBA, dest_colors=None, debug=False, noresize=False):
+        if dest_colors is None:
+            dest_colors = data_colors
         glBindTexture(GL_TEXTURE_2D, self.texid)
-        glTexImage2D(GL_TEXTURE_2D, 0, data_colors, self.w, self.h, 0, data_colors, data_type, data)
+        if noresize:
+            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, self.w, self.h, data_colors, data_type, data)
+        else:
+            glTexImage2D(GL_TEXTURE_2D, 0, dest_colors, self.w, self.h, 0, data_colors, data_type, data)
+        if debug:
+            print('Loaded this texture:')
+            print(glGetTexImage(GL_TEXTURE_2D, 0, data_colors, data_type))
         glBindTexture(GL_TEXTURE_2D, 0)
 
     def bindtexunit(self, unit=None):

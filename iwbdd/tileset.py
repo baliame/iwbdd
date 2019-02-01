@@ -60,6 +60,7 @@ class Tileset:
         self.stride = 0
         self.vec_buf = Vec4(1.0, 1.0, 1.0, 1.0)
         self.model = Mat4()
+        self.unit_arrays = VBO(np.array([0, 0, 1, 0, 0, 1, 1, 1], dtype='f'))
         self.draw_arrays = VBO(np.array([0, 0, Tileset.TILE_W, 0, 0, Tileset.TILE_H, Tileset.TILE_W, Tileset.TILE_H], dtype='f'))
         self.uv_arrays = VBO(np.array([0, 0, 1, 0, 0, 1, 1, 1], dtype='f'))
         self.wh_arrays = VBO(np.array([0, 0, 1, 0, 0, 2, 1, 2], dtype='f'))
@@ -109,22 +110,42 @@ class Tileset:
             glDisableVertexAttribArray(0)
             glDisableVertexAttribArray(1)
 
-    def draw_full_screen(self, x, y, draw_w, draw_h):
+    def draw_full_screen(self, x, y, draw_w, draw_h, transparency_tex, tileids_tex):
         with GSHp('GSHP_render_terrain') as prog:
             Window.instance.setup_render(prog)
-            prog.uniform('model', Mat4())
+            prog.uniform('model', Mat4.scaling(draw_w, draw_h, 1))
             prog.uniform('tile_w', float(Tileset.TILE_W))
             prog.uniform('tile_h', float(Tileset.TILE_H))
             prog.uniform('colorize', self.vec_buf)
             self.tex.bindtexunit(0)
+            transparency_tex.bindtexunit(1)
+            tileids_tex.bindtexunit(2)
             glEnableVertexAttribArray(0)
             glEnableVertexAttribArray(1)
-            self.wh_arrays[:] = np.array([0, 0, draw_w, 0, 0, draw_h, draw_w, draw_h], dtype='f')
-            self.wh_arrays.bind()
-            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, self.wh_arrays)
+            # self.wh_arrays.set_array(np.array([0, 0, draw_w, 0, 0, draw_h, draw_w, draw_h], dtype=float))
+            self.unit_arrays.bind()
+            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, self.unit_arrays)
             self.uv_arrays.bind()
             glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, self.uv_arrays)
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
             logger.log_draw()
             glDisableVertexAttribArray(0)
             glDisableVertexAttribArray(1)
+
+    def blit_tileids(self, x, y, w, h, tileids_tex):
+        with GSHp("GSHP_blit") as prog:
+            Window.instance.setup_render(prog)
+            prog.uniform('model', Mat4.scaling(w, h, 1))
+            prog.uniform('colorize', Vec4(1.0, 1.0, 1.0, 1.0))
+            tileids_tex.bindtexunit(1)
+            glEnableVertexAttribArray(0)
+            glEnableVertexAttribArray(1)
+            self.draw_arrays.bind()
+            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, self.unit_arrays)
+            self.uv_arrays.bind()
+            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, self.uv_arrays)
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
+            logger.log_draw()
+            glDisableVertexAttribArray(0)
+            glDisableVertexAttribArray(1)
+

@@ -130,7 +130,7 @@ class Screen:
         self.gravity = (0, 0.4)
         self.jump_frames = 22
         self.objects_dirty = True
-        self.tileids = Texture2D(Screen.SCREEN_W, Screen.SCREEN_H, np.zeros((Screen.SCREEN_H, Screen.SCREEN_W), dtype=np.uint32), arr_type=GL_UNSIGNED_INT, arr_colors=GL_RED, magf=GL_NEAREST)
+        self.tileids = Texture2D(Screen.SCREEN_W, Screen.SCREEN_H, np.ones((Screen.SCREEN_W, Screen.SCREEN_H), dtype=np.uint32), arr_type=GL_UNSIGNED_INT, arr_colors=GL_RED_INTEGER, dest_colors=GL_R32UI, magf=GL_NEAREST, minf=GL_NEAREST)
         if tile_data is not None:
             self.load_tile_data(tile_data)
 
@@ -338,20 +338,24 @@ class Screen:
             self.bound_objects[i].write_to_writer(target)
 
     def render_to_window(self, wnd, layer=None):
+        #print(1)
         if self.dirty:
-            tile_idx = np.zeros((Screen.SCREEN_H, Screen.SCREEN_W), dtype=np.uint32)
+            tile_idx = np.zeros((Screen.SCREEN_W, Screen.SCREEN_H), dtype=np.uint32)
             for y in range(Screen.SCREEN_H):
                 for x in range(Screen.SCREEN_W):
                     tx, ty = (self.tiles[y][x][0], self.tiles[y][x][1])
-                    tile_idx[y][x] = self.world.tileset.stride * ty + tx
-            self.tileids.set_image(tile_idx, GL_UNSIGNED_INT, GL_RED)
+                    tile_idx[x][y] = self.world.tileset.stride * ty + tx
+            # self.tileids.set_image(tile_idx, GL_UNSIGNED_INT, GL_RED_INTEGER, dest_colors=GL_R32UI, debug=True, noresize=True)
             print(tile_idx)
             self.dirty = False
+        #print(2)
         with wnd.fbo as fbo:
-            self.background.draw(0, 0, wnd.w, wnd.h)
-            fbo.bindtexunit(1)
-            self.tileids.bindtexunit(2)
-            self.world.tileset.draw_full_screen(0, 0, wnd.w, wnd.h)
+            #self.background.draw(0, 0, wnd.w, wnd.h)
+            # fbo.bindtexunit(1)
+            # self.tileids.bindtexunit(2)
+            #self.world.tileset.blit_tileids(0, 0, wnd.w, wnd.h,)
+            self.world.tileset.draw_full_screen(0, 0, wnd.w, wnd.h, fbo, self.tileids)
+        #print(3)
 
     def render_objects(self, wnd):
         for obj in self.objects:

@@ -25,13 +25,14 @@ class Window:
 
         self.glw = glfw.create_window(w, h, title, None, None)
         glfw.make_context_current(self.glw)
-        # print("OpenGL: " + str(glGetString(GL_VERSION)))
         #self.display = pygame.display.set_mode((w, h), pygame.DOUBLEBUF | pygame.OPENGL)
         #pygame.display.set_caption(title)
         self.vao = glGenVertexArrays(1)
         glBindVertexArray(self.vao)
         self.fbo = Framebuffer(w, h, self, name='Window alpha buffer')
         self.view = Mat4.scaling(2.0 / w, 2.0 / h, 1).translate(-1, -1)
+        glDisable(GL_DEPTH_TEST)
+        print("OpenGL: " + str(glGetString(GL_VERSION)))
 
     def update(self):
         pygame.display.update()
@@ -45,8 +46,6 @@ class Window:
         self.fbo.new_render_pass()
         self.fbo.bindtexunit(1)
         prog.uniform('view', self.view)
-        prog.uniform('wscale', float(self.w))
-        prog.uniform('hscale', float(self.h))
 
 
 class WindowSection(Window):

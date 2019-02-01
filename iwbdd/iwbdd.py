@@ -51,7 +51,8 @@ def opengl_tests_main():
         # w.fbo.unbind()
         w.fbo.blit_to_window()
         glfw.swap_buffers(w.glw)
-        time.sleep(0.02)
+        #time.sleep(0.02)
+        time.sleep(1)
     m.quit()
 
 
