@@ -45,6 +45,7 @@ class Background:
     identity = None
     draw_arrays = None
     uv_arrays = None
+    vao = None
 
     @staticmethod
     def find(bid):
@@ -57,6 +58,15 @@ class Background:
             Background.identity = Mat4()
             Background.draw_arrays = VBO(np.array([0, 0, 1, 0, 0, 1, 1, 1], dtype='f'))
             Background.uv_arrays = VBO(np.array([0, 0, 1, 0, 0, 1, 1, 1], dtype='f'))
+            Background.vao = glGenVertexArrays(1)
+            glBindVertexArray(Background.vao)
+            Background.draw_arrays.bind()
+            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, Background.draw_arrays)
+            Background.uv_arrays.bind()
+            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, Background.uv_arrays)
+            Background.draw_arrays.unbind()
+            Background.uv_arrays.unbind()
+            glBindVertexArray(0)
         self.background_id = 0
         self.image_surface = None
         if reader is not None:
@@ -76,13 +86,11 @@ class Background:
             prog.uniform('model', Mat4.scaling(w, h, 1))
             prog.uniform('colorize', Vec4(1.0, 1.0, 1.0, 1.0))
             self.tex.bindtexunit(1)
+            glBindVertexArray(Background.vao)
             glEnableVertexAttribArray(0)
             glEnableVertexAttribArray(1)
-            self.draw_arrays.bind()
-            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, self.draw_arrays)
-            self.uv_arrays.bind()
-            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, self.uv_arrays)
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
             logger.log_draw()
             glDisableVertexAttribArray(0)
             glDisableVertexAttribArray(1)
+            glBindVertexArray(0)

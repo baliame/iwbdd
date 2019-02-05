@@ -27,8 +27,6 @@ class Window:
         glfw.make_context_current(self.glw)
         #self.display = pygame.display.set_mode((w, h), pygame.DOUBLEBUF | pygame.OPENGL)
         #pygame.display.set_caption(title)
-        self.vao = glGenVertexArrays(1)
-        glBindVertexArray(self.vao)
         self.fbo = Framebuffer(w, h, self, name='Window alpha buffer')
         self.view = Mat4.scaling(2.0 / w, 2.0 / h, 1).translate(-1, -1)
         glDisable(GL_DEPTH_TEST)
