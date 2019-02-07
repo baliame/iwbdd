@@ -65,10 +65,12 @@ class Tileset:
         self.wh_arrays = VBO(np.array([0, 0, 1, 0, 0, 2, 1, 2], dtype='f'))
         self.vao = glGenVertexArrays(1)
         glBindVertexArray(self.vao)
-        self.draw_arrays.bind()
+        self.unit_arrays.bind()
         glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, self.unit_arrays)
         self.uv_arrays.bind()
         glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, self.uv_arrays)
+        glEnableVertexAttribArray(0)
+        glEnableVertexAttribArray(1)
         glBindVertexArray(0)
         if reader is not None:
             self.read_tileset_data(reader)
@@ -89,7 +91,7 @@ class Tileset:
         with self.tex as t:
             idx = 0
             for y in range(yf):
-                sy = img_data.height - y * Tileset.TILE_H
+                sy = img_data.height - (y + 1) * Tileset.TILE_H
                 for x in range(xf):
                     sx = x * Tileset.TILE_W
                     img = img_data.crop((sx, sy, sx + Tileset.TILE_W, sy + Tileset.TILE_H))
@@ -106,12 +108,8 @@ class Tileset:
             prog.uniform('model', render_loc)
             self.tex.bindtexunit(0)
             glBindVertexArray(self.vao)
-            glEnableVertexAttribArray(0)
-            glEnableVertexAttribArray(1)
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
             logger.log_draw()
-            glDisableVertexAttribArray(0)
-            glDisableVertexAttribArray(1)
             glBindVertexArray(0)
 
     def draw_full_screen(self, x, y, draw_w, draw_h, transparency_tex, tileids_tex):
@@ -125,26 +123,6 @@ class Tileset:
             transparency_tex.bindtexunit(1)
             tileids_tex.bindtexunit(2)
             glBindVertexArray(self.vao)
-            glEnableVertexAttribArray(0)
-            glEnableVertexAttribArray(1)
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
             logger.log_draw()
-            glDisableVertexAttribArray(0)
-            glDisableVertexAttribArray(1)
             glBindVertexArray(0)
-
-    def blit_tileids(self, x, y, w, h, tileids_tex):
-        with GSHp("GSHP_blit") as prog:
-            Window.instance.setup_render(prog)
-            prog.uniform('model', Mat4.scaling(w, h, 1))
-            prog.uniform('colorize', Vec4(1.0, 1.0, 1.0, 1.0))
-            tileids_tex.bindtexunit(1)
-            glBindVertexArray(self.vao)
-            glEnableVertexAttribArray(0)
-            glEnableVertexAttribArray(1)
-            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
-            logger.log_draw()
-            glDisableVertexAttribArray(0)
-            glDisableVertexAttribArray(1)
-            glBindVertexArray(0)
-

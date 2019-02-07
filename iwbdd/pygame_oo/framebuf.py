@@ -2,7 +2,7 @@ from OpenGL.GL import *
 from OpenGL.arrays.vbo import VBO
 import numpy as np
 from .game_shaders import GSH
-from .shader import Mat4
+from .shader import Mat4, Vec4
 from .texture import Texture2D, TexUnitEnum
 from . import logger
 
@@ -23,11 +23,22 @@ class Framebuffer:
         self.uv_arrays = VBO(np.array([0, 0, 1, 0, 0, 1, 1, 1], dtype='f'))
         self.view = Mat4.scaling(2, 2, 1).translate(-1, -1)
         self.identity = Mat4()
+        self.vao = glGenVertexArrays(1)
+        glBindVertexArray(self.vao)
+        self.draw_arrays.bind()
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, self.draw_arrays)
+        self.uv_arrays.bind()
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, self.uv_arrays)
+        glBindVertexArray(0)
 
     def bind(self):
         glBindFramebuffer(GL_FRAMEBUFFER, self.fbid)
         logger.log_fb_bound = self
         Framebuffer.bound = self
+
+    def bindmaintexunit(self, unit):
+        glActiveTexture(TexUnitEnum(unit))
+        glBindTexture(GL_TEXTURE_2D, self.target.texid)
 
     def bindtexunit(self, unit):
         glActiveTexture(TexUnitEnum(unit))
@@ -38,6 +49,7 @@ class Framebuffer:
         #glBindFramebuffer(GL_FRAMEBUFFER, 0)
         glCopyImageSubData(self.target.texid, GL_TEXTURE_2D, 0, 0, 0, 0, self.transparency.texid, GL_TEXTURE_2D, 0, 0, 0, 0, self.target.w, self.target.h, 1)
         #glBindFramebuffer(GL_FRAMEBUFFER, cbind)
+        #pass
 
     def unbind(self):
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
@@ -67,12 +79,11 @@ class Framebuffer:
         with GSH("GSHP_blit") as prog:
             prog.uniform("view", self.view)
             prog.uniform("model", self.identity)
+            prog.uniform('colorize', Vec4(1.0, 1.0, 1.0, 1.0))
+            self.bindmaintexunit(1)
+            glBindVertexArray(self.vao)
             glEnableVertexAttribArray(0)
             glEnableVertexAttribArray(1)
-            self.draw_arrays.bind()
-            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, self.draw_arrays)
-            self.uv_arrays.bind()
-            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, self.uv_arrays)
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
             logger.log_draw()
             glDisableVertexAttribArray(0)

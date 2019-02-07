@@ -155,9 +155,9 @@ class Object:
                             self.draw(wnd)
                             return
 
-                self.spritesheet.draw_cell_to(wnd.display, state[2][self.animation_frame][0], state[2][self.animation_frame][1], draw_x, draw_y)
+                self.spritesheet.draw_cell_to(state[2][self.animation_frame][0], state[2][self.animation_frame][1], draw_x, draw_y, wnd.fbo)
             else:
-                self.spritesheet.draw_cell_to(wnd.display, state[1][0], state[1][1], draw_x, draw_y)
+                self.spritesheet.draw_cell_to(state[1][0], state[1][1], draw_x, draw_y, wnd.fbo)
 
     def object_editor_draw(self, wnd):
         self.draw(wnd)

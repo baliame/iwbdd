@@ -2,6 +2,7 @@ import os
 from shutil import copyfile
 from .pygame_oo.window import Window
 from .pygame_oo.main_loop import MainLoop
+from .pygame_oo.font import Font
 from .tileset import pack_tilesets_from_files, read_tilesets
 from .background import pack_backgrounds_from_files, read_backgrounds
 from .spritesheet import pack_spritesheets_from_files, read_spritesheets
@@ -40,15 +41,19 @@ def opengl_tests_main():
 
     c = Controller(m)
     c.load_world_from_file(sys.argv[1])
+    c.current_screen = c.current_world.screens[1]
+    font = Font(w, 'arial.ttf')
+    font.draw('test1', 'yes', 0, 0, (255, 0, 0, 128))
     while glfw.get_key(w.glw, glfw.KEY_ESCAPE) != glfw.PRESS:
+        w.use_full_viewport()
         glClearColor(0.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         w.fbo.new_render_pass(True)
-        c.current_screen.render_to_window(w)
-        # w.fbo.bind()
-        # fb_data = glReadPixels(0, 0, 1008, 768, GL_RGBA, GL_UNSIGNED_BYTE)
-        # print(fb_data)
-        # w.fbo.unbind()
+        with w.fbo as fbo:
+            w.use_game_viewport()
+            c.current_screen.render_to_window(w)
+            w.use_full_viewport()
+            font.render(fbo)
         w.fbo.blit_to_window()
         glfw.swap_buffers(w.glw)
         #time.sleep(0.02)

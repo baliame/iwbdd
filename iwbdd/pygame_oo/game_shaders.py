@@ -45,7 +45,7 @@ void main() {
     spr.a *= colorize.a;
 
     vec3 clr = spr.a * spr.rgb + (1 - spr.a) * scr.rgb;
-    out_color = vec4(clr.rgb, 1);
+    out_color = vec4(clr.rgb * colorize.rgb, 1);
 }
 
 """.strip()
@@ -71,7 +71,7 @@ void main() {
     spr.a *= colorize.a;
 
     vec3 clr = spr.a * spr.rgb + (1 - spr.a) * scr.rgb;
-    out_color = vec4(clr.rgb, 1);
+    out_color = vec4(clr.rgb * colorize.rgb, 1);
 }
 
 """.strip()
@@ -97,20 +97,25 @@ void main() {
     // return;
 
     // float tex_idx = float(texelFetch(tile_idx, ivec2(41, 31), 0).r);
+    float tx = in_screen_pos.x / tile_w;
+    uint tx_i = uint(tx);
+    float ty = in_screen_pos.y / tile_h;
+    uint ty_i = uint(ty);
     uvec4 tex_idxu = texelFetch(tile_idx, ivec2(int(in_screen_pos.x / tile_w), int(in_screen_pos.y / tile_h)), 0);
     float tex_idx = float(tex_idxu.r);
     // float tex_idx = texture(tile_idx, vec2(in_screen_pos.x / tile_w, in_screen_pos.y / tile_h)).r;
 
-    out_color = vec4(vec3(tex_idxu.rgb), 1);
-    return;
+    // out_color = vec4(vec3(tex_idxu.rgb), 1);
+    // return;
 
-    vec4 spr = texture(tileset, vec3(in_uv, tex_idx));
+    vec4 spr = texture(tileset, vec3(tx - tx_i, ty - ty_i, tex_idx));
     vec4 scr = texture(screen, in_screen_uv);
 
     spr.a *= colorize.a;
 
     vec3 clr = spr.a * spr.rgb + (1 - spr.a) * scr.rgb;
-    out_color = vec4(clr.rgb, 1);
+    // vec3 clr = 0.5 * spr.rgb + 0.5 * scr.rgb;
+    out_color = vec4(clr.rgb * colorize.rgb, 1);
 }
 
 """.strip()
@@ -124,8 +129,11 @@ layout(location = 1) in vec2 in_uv;
 
 layout(location = 0) out vec4 out_color;
 
+uniform vec4 colorize;
+
 void main() {
-    out_color = texture(screen, in_uv);
+    vec4 blit_color = texture(screen, in_uv);
+    out_color = vec4(blit_color.rgb * colorize.rgb, 1);
 }
 """.strip()
 

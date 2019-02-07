@@ -76,6 +76,15 @@ class Spritesheet:
         self.model = Mat4()
         self.draw_arrays = VBO(np.array([0, 0, 1, 0, 0, 1, 1, 1], dtype='f'))
         self.uv_arrays = VBO(np.array([0, 0, 1, 0, 0, 1, 1, 1], dtype='f'))
+        self.vao = glGenVertexArrays(1)
+        glBindVertexArray(self.vao)
+        self.draw_arrays.bind()
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, self.draw_arrays)
+        self.uv_arrays.bind()
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, self.uv_arrays)
+        glEnableVertexAttribArray(0)
+        glEnableVertexAttribArray(1)
+        glBindVertexArray(0)
         if reader is not None:
             self.read_spritesheet_data(reader)
 
@@ -105,27 +114,29 @@ class Spritesheet:
                     t.set_image(idx, np.frombuffer(img.tobytes(), dtype=np.uint8), data_type=GL_UNSIGNED_BYTE, data_colors=GL_RGB if len(bands) == 3 else GL_RGBA)
                     idx += 1
         # self.variants[(None, 255, 1)] = self.image_surface
+        self.model = Mat4.scaling(self.cell_w, self.cell_h)
 
-    def draw_cell_to(self, target, x, y, draw_x, draw_y):
+    def draw_cell_to(self, x, y, draw_x, draw_y, transparency):
         with GSHp('GSHP_render_sheet') as prog:
-            Window.instance.setup_render(prog)
-            render_loc = self.model * Mat4.translation(draw_x, draw_y)
+            render_loc = self.model * Mat4.translation(draw_x, Window.instance.h - draw_y)
+            # render_loc = Mat4.translation(draw_x, draw_y) * self.model
+            # render_loc = self.model
             self.vec_buf.load_rgb_a(self.variant_color, self.variant_alpha)
-            prog.uniform('colorize', self.vec_buf)
             tex_idx = float(x + self.stride * y)
+
+            Window.instance.setup_render(prog)
+
+            prog.uniform('colorize', self.vec_buf)
             prog.uniform('tex_idx', tex_idx)
             prog.uniform('model', render_loc)
+
             self.tex.bindtexunit(0)
-            glEnableVertexAttribArray(0)
-            glEnableVertexAttribArray(1)
-            self.draw_arrays.bind()
-            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, self.draw_arrays)
-            self.uv_arrays.bind()
-            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, self.uv_arrays)
+            transparency.bindtexunit(1)
+
+            glBindVertexArray(self.vao)
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
             logger.log_draw()
-            glDisableVertexAttribArray(0)
-            glDisableVertexAttribArray(1)
+            glBindVertexArray(0)
 
 #        variant_scale = 1 / self.variant_downscale
 #        variant_key = (self.variant_color, self.variant_alpha, self.variant_downscale)

@@ -66,6 +66,8 @@ class Background:
             glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, Background.uv_arrays)
             Background.draw_arrays.unbind()
             Background.uv_arrays.unbind()
+            glEnableVertexAttribArray(0)
+            glEnableVertexAttribArray(1)
             glBindVertexArray(0)
         self.background_id = 0
         self.image_surface = None
@@ -87,10 +89,6 @@ class Background:
             prog.uniform('colorize', Vec4(1.0, 1.0, 1.0, 1.0))
             self.tex.bindtexunit(1)
             glBindVertexArray(Background.vao)
-            glEnableVertexAttribArray(0)
-            glEnableVertexAttribArray(1)
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
             logger.log_draw()
-            glDisableVertexAttribArray(0)
-            glDisableVertexAttribArray(1)
             glBindVertexArray(0)
