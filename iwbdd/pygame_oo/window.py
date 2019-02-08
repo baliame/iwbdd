@@ -1,15 +1,15 @@
-import pygame
 from OpenGL.GL import *
 import glfw
 from .framebuf import Framebuffer
 from .shader import Mat4
+from .font import Font
 
 
 class Window:
     instance = None
     enable_log = True
 
-    def __init__(self, w, h, title="pygame window", viewport_w=None, viewport_h=None):
+    def __init__(self, w, h, title="IWBDD window", viewport_w=None, viewport_h=None):
         if Window.instance is not None:
             raise RuntimeError("Window must be a singleton.")
         Window.instance = self
@@ -29,16 +29,15 @@ class Window:
 
         self.glw = glfw.create_window(w, h, title, None, None)
         glfw.make_context_current(self.glw)
-        #self.display = pygame.display.set_mode((w, h), pygame.DOUBLEBUF | pygame.OPENGL)
-        #pygame.display.set_caption(title)
         self.fbo = Framebuffer(w, h, self, name='Window alpha buffer')
+        self.font = Font(self, 'arial.ttf')
         self.view = Mat4.scaling(2.0 / viewport_w, 2.0 / viewport_h, 1).translate(-1, -1)
         self.full_view = Mat4.scaling(2.0 / w, 2.0 / h, 1).translate(-1, -1)
         glDisable(GL_DEPTH_TEST)
         print("OpenGL: " + str(glGetString(GL_VERSION)))
 
     def update(self):
-        pygame.display.update()
+        pass
 
     def get_parent(self):
         return None

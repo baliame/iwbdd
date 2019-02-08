@@ -43,7 +43,9 @@ def opengl_tests_main():
     c.load_world_from_file(sys.argv[1])
     c.current_screen = c.current_world.screens[1]
     font = Font(w, 'arial.ttf')
-    font.draw('test1', 'yes', 0, 0, (255, 0, 0, 128))
+    font.draw('test1', 'yup yup yup', 300, 75, (255, 0, 0, 255))
+    font.draw('test2', 'maybe', 500, 300, (255, 255, 255, 255))
+    font.draw('test3', 'yeah', 200, 200, (0, 0, 255, 255))
     while glfw.get_key(w.glw, glfw.KEY_ESCAPE) != glfw.PRESS:
         w.use_full_viewport()
         glClearColor(0.0, 0.0, 0.0, 1.0)

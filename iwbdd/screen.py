@@ -130,7 +130,9 @@ class Screen:
         self.gravity = (0, 0.4)
         self.jump_frames = 22
         self.objects_dirty = True
-        self.tileids = Texture2D(Screen.SCREEN_W, Screen.SCREEN_H, np.zeros((Screen.SCREEN_H, Screen.SCREEN_W), dtype=np.uint32), arr_type=GL_UNSIGNED_INT, arr_colors=GL_RED_INTEGER, dest_colors=GL_R32UI, magf=GL_NEAREST, minf=GL_NEAREST)
+        self.tileids = {}
+        for layer in range(Layer.LAYER_COUNT):
+            self.tileids[layer] = Texture2D(Screen.SCREEN_W, Screen.SCREEN_H, np.zeros((Screen.SCREEN_H, Screen.SCREEN_W), dtype=np.uint32), arr_type=GL_UNSIGNED_INT, arr_colors=GL_RED_INTEGER, dest_colors=GL_R32UI, magf=GL_NEAREST, minf=GL_NEAREST)
         if tile_data is not None:
             self.load_tile_data(tile_data)
 
@@ -338,22 +340,19 @@ class Screen:
             self.bound_objects[i].write_to_writer(target)
 
     def render_to_window(self, wnd, layer=None):
-        #print(1)
         if self.dirty:
-            tile_idx = np.zeros((Screen.SCREEN_H, Screen.SCREEN_W), dtype=np.uint32)
-            for y in range(Screen.SCREEN_H):
-                for x in range(Screen.SCREEN_W):
-                    tx, ty = (self.tiles[y][x][0], self.tiles[y][x][1])
-                    tile_idx[Screen.SCREEN_H - (y + 1)][x] = self.world.tileset.stride * ty + tx
-            self.tileids.set_image(tile_idx, GL_UNSIGNED_INT, GL_RED_INTEGER, dest_colors=GL_R32UI, debug=True, noresize=True)
-            print(tile_idx)
-            self.dirty = False
-        #print(2)
+            for layer in range(Layer.LAYER_COUNT):
+                tile_idx = np.zeros((Screen.SCREEN_H, Screen.SCREEN_W), dtype=np.uint32)
+                for y in range(Screen.SCREEN_H):
+                    for x in range(Screen.SCREEN_W):
+                        tx, ty = (self.tiles[y][x][2 * layer], self.tiles[y][x][1 + 2 * layer])
+                        tile_idx[Screen.SCREEN_H - (y + 1)][x] = self.world.tileset.stride * ty + tx
+                self.tileids[layer].set_image(tile_idx, GL_UNSIGNED_INT, GL_RED_INTEGER, dest_colors=GL_R32UI, debug=True, noresize=True)
+                self.dirty = False
         self.background.draw(0, 0, wnd.w, wnd.h)
-        #self.world.tileset.blit_tileids(0, 0, wnd.w, wnd.h,)
-        self.world.tileset.draw_full_screen(0, 0, wnd.w, wnd.h, wnd.fbo, self.tileids)
+        for layer in LayerDrawOrder:
+            self.world.tileset.draw_full_screen(0, 0, wnd.w, wnd.h, wnd.fbo, self.tileids[int(layer)])
         self.render_objects(wnd)
-        #print(3)
 
     def render_objects(self, wnd):
         for obj in self.objects:
