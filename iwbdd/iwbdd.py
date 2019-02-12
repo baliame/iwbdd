@@ -33,7 +33,6 @@ def opengl_tests_main():
     Boss.enumerate_bosses()
     m.set_window(w)
     m.set_keydown_handler(glfw.KEY_ESCAPE, ml_exit_handler)
-    GSH_init()
     read_tilesets("tilesets.tls")
     read_backgrounds("backgrounds.bgs")
     read_spritesheets("spritesheets.sss")

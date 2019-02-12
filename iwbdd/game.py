@@ -105,8 +105,6 @@ class Controller:
         self.curr_music = None
         self.boss_channels = [mixer.Channel(1), mixer.Channel(2)]
 
-        self.boss_graphics_set = False
-
     def ambience(self, name):
         Audio.audio_by_name[name].play()
 
@@ -590,6 +588,7 @@ class Controller:
 
     def render_elements(self, wnd):
         with wnd:
+            wnd.use_game_viewport()
             if self.current_screen is not None:
                 self.current_screen.render_to_window(wnd)
                 if not self.render_collisions:
@@ -602,14 +601,9 @@ class Controller:
                     self.current_screen.render_objects_hitboxes(wnd)
                     self.player.draw_as_hitbox(wnd, (0, 255, 0))
                 if self.bossfight and self.bossfight.state >= 2:
-                    self.boss_graphics_set = True
                     wnd.graphics.box("boss_health_background", 982 - self.bossfight.boss.initial_health, 23, self.bossfight.boss.initial_health + 2, 26, (0, 0, 0, 255), (0, 0, 0, 255))
                     if self.bossfight.boss.health > 0:
                         wnd.graphics.box("boss_health_bar", 983 - self.bossfight.boss.initial_health, 24, self.bossfight.boss.health, 24, (255, 255, 255, 255), (255, 255, 255, 255))
-                elif self.boss_graphics_set:
-                    wnd.graphics.clear("boss_health_background")
-                    wnd.graphics.clear("boss_health_bar")
-                    self.boss_graphics_set = False
 
     def keydown_handler(self, event, ml):
         if event.key in self.keybindings_lookup:

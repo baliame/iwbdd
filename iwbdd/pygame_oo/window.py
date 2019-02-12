@@ -65,6 +65,7 @@ class Window:
 
     def pre_blit(self):
         with self.fbo as fbo:
+            self.use_full_viewport()
             self.graphics.render(self, fbo)
             self.font.render(self, fbo)
 
@@ -73,11 +74,14 @@ class Window:
         glClearColor(0.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         self.fbo.new_render_pass(True)
-        self.fbo.__enter__()
+        self.fbo.bind()
+        return self
 
     def __exit__(self, *args):
-        self.fbo.__exit__(*args)
+        self.fbo.unbind()
+        self.pre_blit()
         self.fbo.blit_to_window()
+        glfw.swap_buffers(self.glw)
 
 
 class WindowSection(Window):

@@ -332,7 +332,6 @@ class Screen:
         self.background.draw(0, 0, wnd.w, wnd.h)
         for l2 in LayerDrawOrder:
             self.world.tileset.draw_full_screen(0, 0, wnd.w, wnd.h, wnd.fbo, self.tileids[int(l2)])
-        self.render_objects(wnd)
 
     def render_objects(self, wnd):
         for obj in self.objects:
