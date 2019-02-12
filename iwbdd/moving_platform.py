@@ -1,4 +1,4 @@
-from .object import Object, EPType, generate_rectangle_hitbox, SurfaceWrapper
+from .object import Object, EPType
 from .spritesheet import Spritesheet
 from .common import CollisionTest
 from collections import OrderedDict
@@ -26,7 +26,8 @@ class MovingPlatform(Object):
         self.init_y = self.y
         self._offset_x = 0
         self._offset_y = -16
-        self.hitbox = generate_rectangle_hitbox(32, 16)
+        self.hitbox_w = 32
+        self.hitbox_h = 16
         self.hitbox_type = CollisionTest.SOLID
         self.dx = 0
         self.dy = 0

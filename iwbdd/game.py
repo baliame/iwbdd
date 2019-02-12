@@ -105,6 +105,8 @@ class Controller:
         self.curr_music = None
         self.boss_channels = [mixer.Channel(1), mixer.Channel(2)]
 
+        self.boss_graphics_set = False
+
     def ambience(self, name):
         Audio.audio_by_name[name].play()
 
@@ -280,9 +282,9 @@ class Controller:
         if id == 0:
             self.player.x = 0
         elif id == 1:
-            self.player.y = SCREEN_SIZE_H - len(self.player.hitbox[0])
+            self.player.y = SCREEN_SIZE_H - self.player.hitbox_h
         elif id == 2:
-            self.player.x = SCREEN_SIZE_W - len(self.player.hitbox)
+            self.player.x = SCREEN_SIZE_W - self.player.hitbox_w
         elif id == 3:
             self.player.y = 0
         self.player.screen = self.current_screen
@@ -321,7 +323,7 @@ class Controller:
             self.player.fire()
         # print("==== Running simulation for frame")
         if self.player.cached_collision is None:
-            self.player.cached_collision = self.current_screen.test_screen_collision(int(self.player.x), int(self.player.y), self.player.hitbox)
+            self.player.cached_collision = self.current_screen.test_screen_collision(int(self.player.x), int(self.player.y), (self.player.hitbox_w, self.player.hitbox_h))
             # print("Checking initial collision at {0} {1} - result: {2}".format(int(self.player.x), int(self.player.y), self.player.cached_collision))
         if self.player.cached_collision[4][0] & CollisionTest.DEADLY:
             self.player.die()
@@ -545,7 +547,7 @@ class Controller:
                 acc_ty = nyt
             else:
                 break
-            coll = self.current_screen.test_screen_collision(pt[0], pt[1], self.player.hitbox)
+            coll = self.current_screen.test_screen_collision(pt[0], pt[1], (self.player.hitbox_w, self.player.hitbox_h))
             overlap = coll[4][0]
             if overlap & CollisionTest.DEADLY:
                 self.player.die()
@@ -576,7 +578,7 @@ class Controller:
                 sloping = 0
             self.player.x = pt[0]
             self.player.y = pt[1]
-            self.current_screen.test_interactable_collision(self, pt[0], pt[1], self.player.hitbox)
+            self.current_screen.test_interactable_collision(self, pt[0], pt[1], (self.player.hitbox_w, self.player.hitbox_h))
         self.player.x = dest[0]
         self.player.y = dest[1]
         self.player.cached_collision = None
@@ -587,21 +589,27 @@ class Controller:
         self.render_elements(wnd)
 
     def render_elements(self, wnd):
-        if self.current_screen is not None:
-            self.current_screen.render_to_window(wnd)
-            if not self.render_collisions:
-                self.current_screen.render_objects(wnd)
-                self.player.draw(wnd)
-            else:
-                self.current_screen.render_collisions_to_window(wnd)
-                if self.also_render_objects:
+        with wnd:
+            if self.current_screen is not None:
+                self.current_screen.render_to_window(wnd)
+                if not self.render_collisions:
                     self.current_screen.render_objects(wnd)
-                self.current_screen.render_objects_hitboxes(wnd)
-                self.player.draw_as_hitbox(wnd, (0, 255, 0))
-            if self.bossfight and self.bossfight.state >= 2:
-                pygame.draw.rect(wnd.display, (0, 0, 0), pygame.Rect(982 - self.bossfight.boss.initial_health, 23, self.bossfight.boss.initial_health + 2, 26))
-                if self.bossfight.boss.health > 0:
-                    pygame.draw.rect(wnd.display, (255, 255, 255), pygame.Rect(983 - self.bossfight.boss.initial_health, 24, self.bossfight.boss.health, 24))
+                    self.player.draw(wnd)
+                else:
+                    self.current_screen.render_collisions_to_window(wnd)
+                    if self.also_render_objects:
+                        self.current_screen.render_objects(wnd)
+                    self.current_screen.render_objects_hitboxes(wnd)
+                    self.player.draw_as_hitbox(wnd, (0, 255, 0))
+                if self.bossfight and self.bossfight.state >= 2:
+                    self.boss_graphics_set = True
+                    wnd.graphics.box("boss_health_background", 982 - self.bossfight.boss.initial_health, 23, self.bossfight.boss.initial_health + 2, 26, (0, 0, 0, 255), (0, 0, 0, 255))
+                    if self.bossfight.boss.health > 0:
+                        wnd.graphics.box("boss_health_bar", 983 - self.bossfight.boss.initial_health, 24, self.bossfight.boss.health, 24, (255, 255, 255, 255), (255, 255, 255, 255))
+                elif self.boss_graphics_set:
+                    wnd.graphics.clear("boss_health_background")
+                    wnd.graphics.clear("boss_health_bar")
+                    self.boss_graphics_set = False
 
     def keydown_handler(self, event, ml):
         if event.key in self.keybindings_lookup:

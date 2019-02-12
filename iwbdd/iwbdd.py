@@ -54,8 +54,9 @@ def opengl_tests_main():
         with w.fbo as fbo:
             w.use_game_viewport()
             c.current_screen.render_to_window(w)
+            c.current_screen.render_all_collisions_to_window(w, fbo)
             w.use_full_viewport()
-            font.render(fbo)
+            font.render(w, fbo)
         w.fbo.blit_to_window()
         glfw.swap_buffers(w.glw)
         #time.sleep(0.02)

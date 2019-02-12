@@ -10,12 +10,13 @@ from . import logger
 class Framebuffer:
     bound = None
 
-    def __init__(self, w, h, wnd, name='Unknown'):
-        self.wnd = wnd
+    def __init__(self, w, h, name='Unknown'):
         self.fbo_name = name
         self.fbid = glGenFramebuffers(1)
         self.target = Texture2D(w, h, None)
         self.transparency = Texture2D(w, h, None)
+        self.w = w
+        self.h = h
         glBindFramebuffer(GL_FRAMEBUFFER, self.fbid)
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, self.target.texid, 0)
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
@@ -36,6 +37,10 @@ class Framebuffer:
         logger.log_fb_bound = self
         Framebuffer.bound = self
 
+    def use_external_texture(self, tex):
+        self.target = tex
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, self.target.texid, 0)
+
     def bindmaintexunit(self, unit):
         glActiveTexture(TexUnitEnum(unit))
         glBindTexture(GL_TEXTURE_2D, self.target.texid)
@@ -45,11 +50,7 @@ class Framebuffer:
         glBindTexture(GL_TEXTURE_2D, self.transparency.texid)
 
     def read_copy(self):
-        #cbind = glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING)
-        #glBindFramebuffer(GL_FRAMEBUFFER, 0)
         glCopyImageSubData(self.target.texid, GL_TEXTURE_2D, 0, 0, 0, 0, self.transparency.texid, GL_TEXTURE_2D, 0, 0, 0, 0, self.target.w, self.target.h, 1)
-        #glBindFramebuffer(GL_FRAMEBUFFER, cbind)
-        #pass
 
     def unbind(self):
         glBindFramebuffer(GL_FRAMEBUFFER, 0)

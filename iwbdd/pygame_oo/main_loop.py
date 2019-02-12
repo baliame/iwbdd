@@ -58,6 +58,7 @@ class MainLoop:
         self.tickers = []
         self.updatables = []
         self.renderers = []
+        self.prerenderers = []
         self.atexit = []
         self.keydown_handlers = {}
         self.blanket_keydown_handler = None
@@ -118,6 +119,9 @@ class MainLoop:
 
     def add_render_callback(self, cb):
         self.renderers.append(cb)
+
+    def add_pre_render_callback(self, cb):
+        self.prerenderers.append(cb)
 
     def add_ticker(self, cb):
         self.tickers.append(cb)
@@ -187,15 +191,16 @@ class MainLoop:
         self.measured_fps = 0
         while not glfw.window_should_close(self.top_window.glw) and not self.prepare_exit:
             glfw.poll_events()
-            self.window.display.fill(0)
             MainLoop.render_sync_stamp = glfw.get_time()
             if not self.suspend_ticking:
                 for ticker in self.tickers:
                     ticker(self)
+            for prerenderer in self.prerenderers:
+                prerenderer(self.window)
             for renderer in self.renderers:
                 renderer(self.window)
-            for updatable in self.updatables:
-                updatable.update()
+            # for updatable in self.updatables:
+            #     updatable.update()
             temp_fps += 1
             while glfw.get_time() < last_time + spf:
                 time.sleep(0.001)

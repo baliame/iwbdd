@@ -1,7 +1,10 @@
 from .pygame_oo.main_loop import MainLoop
-from pygame.locals import SRCALPHA
-import pygame
-from .common import mousebox, CollisionTest, eofc_read, COLLISIONTEST_PREVENTS_MOVEMENT, SCREEN_SIZE_W, SCREEN_SIZE_H
+from .common import mousebox, CollisionTest, eofc_read, COLLISIONTEST_PREVENTS_MOVEMENT, SCREEN_SIZE_W
+from .pygame_oo.shader import Mat4, Vec4
+from .pygame_oo.game_shaders import GSHp
+from .pygame_oo import logger
+from OpenGL.GL import *
+from OpenGL.arrays.vbo import VBO
 from enum import Enum
 import numpy as np
 import struct
@@ -32,21 +35,10 @@ class EPType(Enum):
     FloatSelector = 3    # Arguments: default, min, max, step
     HiddenSelector = 4  # Arguments: -
 
-
-class SurfaceWrapper:
-    def __init__(self, w, h):
-        self.display = pygame.Surface((w, h), SRCALPHA)
-        self.display.fill((0, 0, 0, 0))
-
-
-class ExistingSurfaceWrapper:
-    def __init__(self, surf):
-        self.display = surf
-
-
 # Object state
 # Unanimated: (False, (sheet_cell_x, sheet_cell_y))
 # Animated:   (True, animation_speed, [(sheet_cell_x, sheet_cell_y)...], looping [True|False|next animation state])
+
 
 class Object:
     editor_properties = {}
@@ -85,15 +77,14 @@ class Object:
         self.SH_colorize = (1.0, 1.0, 1.0, 1.0)
 
         self.last_sync_stamp = MainLoop.render_sync_stamp
-        self.hitbox = None
         self.managed_hbds = False
         self.hitbox_type = CollisionTest.PASSABLE
+        self.hitbox_w = 0
+        self.hitbox_h = 0
+        self.hitbox_model = None
+        self.hitbox_vao = glGenVertexArrays(1)
 
-        self.hb_bg_w = 0
-        self.hb_bg_h = 0
         self.hbds_dirty = True
-        self.hitbox_draw_surface = None
-        self.hitbox_draw_surface_color = None
 
         if init_dict is not None:
             for dest_var, init_val in init_dict.items():
@@ -162,40 +153,29 @@ class Object:
     def object_editor_draw(self, wnd):
         self.draw(wnd)
 
-    def _regen_hitbox(self, color):
-        w = len(self.hitbox)
-        if w <= 0:
-            self.hitbox_draw_surface = None
-            return
-        h = len(self.hitbox[0])
-        self.hitbox_draw_surface = pygame.Surface((w if w > self.hb_bg_w else self.hb_bg_w, h if h > self.hb_bg_h else self.hb_bg_h), SRCALPHA)
-        self.hitbox_draw_surface_color = color
-        self.hbds_dirty = False
-        with pygame.PixelArray(self.hitbox_draw_surface) as hdpa:
-            fill = (color[0], color[1], color[2], 0) if self.hb_bg_w == 0 or self.hb_bg_h == 0 else (color[0], color[1], color[2], 64)
-            hdpa[:] = fill
-            for yo in range(h):
-                for xo in range(w):
-                    if self.hitbox[xo, yo]:
-                        if self.hb_bg_w == 0 or self.hb_bg_h == 0:
-                            hdpa[xo, yo] = (color[0], color[1], color[2], 255)
-                        else:
-                            hdpa[xo + abs(self._offset_x), yo + abs(self._offset_y)] = (color[0], color[1], color[2], 255)
-
     def draw_as_hitbox(self, wnd, color):
-        if self.hitbox is None or self.hidden:
-                return
-        ix = int(self.x)
-        iy = int(self.y)
-        if not self.managed_hbds:
-            if self.hbds_dirty or self.hitbox_draw_surface is None or color != self.hitbox_draw_surface_color:
-                self._regen_hitbox(color)
-        if self.hb_bg_w == 0 or self.hb_bg_h == 0:
-            dest = (ix, iy)
-        else:
-            dest = (ix + self._offset_x, iy + self._offset_y)
-        if self.hitbox_draw_surface is not None:
-            wnd.display.blit(self.hitbox_draw_surface, dest)
+        if self.hidden:
+            return
+        if not self.managed_hbds and self.hitbox_w > 0 and self.hitbox_h > 0:
+            if self.hitbox_model is None:
+                ix = int(self.x)
+                iy = int(self.y)
+                self.hitbox_model = Mat4.scaling(self.hitbox_w, self.hitbox_h).translate(ix + self._offset_x, wnd.h - (iy + self._offset_y))
+                glBindVertexArray(self.hitbox_vao)
+                glEnableVertexAttribArray(0)
+                temp = VBO(np.array([0, 0, 1, 0, 0, 1, 1, 1], dtype='f'))
+                temp.bind()
+                glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, temp)
+                temp.unbind()
+                glBindVertexArray(0)
+            with GSHp("GSHP_colorfill") as prog:
+                wnd.setup_render(prog)
+                prog.uniform('model', self.hitbox_model)
+                prog.uniform('colorize', Vec4(color[0] / 255.0, color[1] / 255.0, color[2] / 255.0, 1.0))
+                glBindVertexArray(self.hitbox_vao)
+                glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
+                logger.log_draw()
+                glBindVertexArray(0)
 
     def tick(self, scr, ctrl):
         pass
@@ -342,7 +322,6 @@ class ExplosionEffect(Object):
     saveable = False
 
     def __init__(self, screen, x=0, y=0, init_dict=None):
-        self.hitbox = None
         super().__init__(screen, x, y, init_dict)
         self.spritesheet = Spritesheet.spritesheets_byname["ss_explosion-48-48.png"]
         self.states = {
@@ -368,7 +347,6 @@ class ExplosionEffect(Object):
 class Bullet(Object):
     exclude_from_object_editor = True
     velocity = 6
-    hitbox = None
     saveable = False
 
     def __init__(self, screen, x=0, y=0, init_dict=None):
@@ -380,8 +358,6 @@ class Bullet(Object):
         self.xv = Bullet.velocity * init_dict["facing"]
         self.step = init_dict["facing"]
         self.player = init_dict["player"]
-        if Bullet.hitbox is None:
-            Bullet.hitbox = generate_rectangle_hitbox(4, 4)
         self.spritesheet = Spritesheet.spritesheets_byname["ss_object_bullets-8-8.png"]
         self.states = {
             "default": (False, (0, 0)),
@@ -389,7 +365,8 @@ class Bullet(Object):
         self.state = "default"
         self._offset_x = -2
         self._offset_y = -2
-        self.hitbox = Bullet.hitbox
+        self.hitbox_w = 4
+        self.hitbox_h = 4
         self.hitbox_type = CollisionTest.PASSABLE
         self.abort = False
 
@@ -403,7 +380,7 @@ class Bullet(Object):
             if self.x < 0 or self.x > SCREEN_SIZE_W - 4:
                 self.cleanup_self()
                 return
-            coll = self.screen.test_screen_collision(self.x, self.y, Bullet.hitbox, {0x000080: CollisionTest.SAVE_TILE})
+            coll = self.screen.test_screen_collision(self.x, self.y, (4, 4), {0x000080: CollisionTest.SAVE_TILE})
             # print("{0}, {1}: {2}".format(self.x, self.y, coll))
             idx = 0 if self.xv > 0 else 2
             if coll[4][0] & COLLISIONTEST_PREVENTS_MOVEMENT or coll[idx][0] & COLLISIONTEST_PREVENTS_MOVEMENT:
@@ -413,7 +390,7 @@ class Bullet(Object):
                 self.cleanup_self()
                 self.player.controller.save_state()
                 return
-            self.screen.test_interactable_collision(self.player.controller, self.x, self.y, self.hitbox, CollisionTest.BULLET_INTERACTABLE)
+            self.screen.test_interactable_collision(self.player.controller, self.x, self.y, (4, 4), CollisionTest.BULLET_INTERACTABLE)
             if self.abort:
                 return
 
@@ -430,15 +407,13 @@ class Bullet(Object):
 
 
 class SaveTile(Object):
-    hitbox = None
     object_name = "Save tile (24x24)"
     editor_frame_size = (26, 26)
 
     def __init__(self, screen, x=0, y=0, init_dict=None):
         super().__init__(screen, x, y, init_dict)
-        if SaveTile.hitbox is None:
-            SaveTile.hitbox = generate_rectangle_hitbox(24, 24)
-        self.hitbox = SaveTile.hitbox
+        self.hitbox_w = 24
+        self.hitbox_h = 24
         self.hitbox_type = CollisionTest.SAVE_TILE
         self.screen.objects_dirty = True
         self.spritesheet = Spritesheet.spritesheets_byname["ss_object_shootables-24-24.png"]
@@ -450,8 +425,8 @@ class SaveTile(Object):
 
 frames_per_timer = 20
 
+
 class Button(Object):
-    hitbox = None
     object_name = "Button (shootable, toggle)"
     editor_frame_size = (18, 18)
     editor_properties = {
@@ -461,9 +436,8 @@ class Button(Object):
     def __init__(self, screen, x=0, y=0, init_dict=None):
         self.trigger_group = 0
         super().__init__(screen, x, y, init_dict)
-        if Button.hitbox is None:
-            Button.hitbox = generate_rectangle_hitbox(16, 16)
-        self.hitbox = Button.hitbox
+        self.hitbox_w = 16
+        self.hitbox_h = 16
         self.hitbox_type = CollisionTest.BULLET_INTERACTABLE
         self.screen.objects_dirty = True
         self.spritesheet = Spritesheet.spritesheets_byname["ss_object_shootables-24-24.png"]
@@ -492,7 +466,6 @@ class Button(Object):
 
 
 class TimedButton(Object):
-    hitbox = None
     object_name = "Button (shootable, timer)"
     editor_frame_size = (18, 18)
     editor_properties = {
@@ -506,9 +479,8 @@ class TimedButton(Object):
         self.timer = 5
         self.current_timer = 0
         super().__init__(screen, x, y, init_dict)
-        if TimedButton.hitbox is None:
-            TimedButton.hitbox = generate_rectangle_hitbox(16, 16)
-        self.hitbox = TimedButton.hitbox
+        self.hitbox_w = 16
+        self.hitbox_h = 16
         self.hitbox_type = CollisionTest.BULLET_INTERACTABLE
         self.screen.objects_dirty = True
         self.spritesheet = Spritesheet.spritesheets_byname["ss_object_shootables-24-24.png"]
@@ -565,7 +537,6 @@ class TimedButton(Object):
 
 
 class Perpetuator(Object):
-    hitbox = None
     object_name = "Perpetual timer"
     editor_frame_size = (24, 24)
     editor_properties = {
@@ -579,10 +550,9 @@ class Perpetuator(Object):
         self.timer = 5
         self.current_timer = 0
         super().__init__(screen, x, y, init_dict)
-        if Perpetuator.hitbox is None:
-            Perpetuator.hitbox = generate_rectangle_hitbox(24, 24)
+        self.hitbox_w = 24
+        self.hitbox_h = 24
         self.current_timer = self.timer * frames_per_timer
-        self.hitbox = Perpetuator.hitbox
         self.hitbox_type = CollisionTest.PASSABLE
         self.screen.objects_dirty = True
         self.spritesheet = Spritesheet.spritesheets_byname["ss_object_shootables-24-24.png"]

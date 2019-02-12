@@ -1,5 +1,9 @@
 from OpenGL.GL import *
 import numpy as np
+from .game_shaders import GSHp
+from .shader import Mat4, Vec4
+from OpenGL.arrays.vbo import VBO
+from . import logger
 
 
 def TexUnitEnum(unit):
@@ -11,6 +15,10 @@ def TexUnitEnum(unit):
 
 
 class Texture2D:
+    draw_arrays = None
+    uv_arrays = None
+    vao = None
+
     def __init__(self, w, h, arr=None, arr_type=GL_UNSIGNED_BYTE, arr_colors=GL_RGBA, magf=GL_LINEAR, minf=GL_LINEAR, dest_colors=None, no_init=False):
         if dest_colors is None:
             dest_colors = arr_colors
@@ -30,6 +38,20 @@ class Texture2D:
         self.w = w
         self.h = h
         self.last_unit = None
+        if Texture2D.draw_arrays is None:
+            Texture2D.draw_arrays = VBO(np.array([0, 0, 1, 0, 0, 1, 1, 1], dtype='f'))
+            Texture2D.uv_arrays = VBO(np.array([0, 0, 1, 0, 0, 1, 1, 1], dtype='f'))
+            Texture2D.vao = glGenVertexArrays(1)
+            glBindVertexArray(Texture2D.vao)
+            Texture2D.draw_arrays.bind()
+            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, Texture2D.draw_arrays)
+            Texture2D.uv_arrays.bind()
+            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, Texture2D.uv_arrays)
+            Texture2D.draw_arrays.unbind()
+            Texture2D.uv_arrays.unbind()
+            glEnableVertexAttribArray(0)
+            glEnableVertexAttribArray(1)
+            glBindVertexArray(0)
 
     def bind(self):
         self.bindtexunit()
@@ -42,9 +64,6 @@ class Texture2D:
             glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, self.w, self.h, data_colors, data_type, data)
         else:
             glTexImage2D(GL_TEXTURE_2D, 0, dest_colors, self.w, self.h, 0, data_colors, data_type, data)
-        if debug:
-            print('Loaded this texture:')
-            print(glGetTexImage(GL_TEXTURE_2D, 0, data_colors, data_type))
         glBindTexture(GL_TEXTURE_2D, 0)
 
     def bindtexunit(self, unit=None):
@@ -61,8 +80,20 @@ class Texture2D:
 
     def clear(self):
         glBindTexture(GL_TEXTURE_2D, self.texid)
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, self.w, self.h, 0, GL_RGBA, GL_FLOAT, np.ones(self.w * self.h * 4, dtype=np.float))
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, self.w, self.h, GL_RGBA, GL_FLOAT, np.zeros(self.w * self.h * 4, dtype=np.float))
         glBindTexture(GL_TEXTURE_2D, 0)
+
+    def screen_render(self, wnd, x, y, w, h, transparency, colorize=(1.0, 1.0, 1.0, 1.0)):
+        with GSHp('GSHP_render') as prog:
+            wnd.setup_render(prog)
+            prog.uniform('model', Mat4.scaling(w, h).translate(x, y))
+            prog.uniform('colorize', Vec4(colorize[0], colorize[1], colorize[2], colorize[3]))
+            self.bindtexunit(0)
+            transparency.bindtexunit(1)
+            glBindVertexArray(Texture2D.vao)
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
+            logger.log_draw()
+            glBindVertexArray(0)
 
 
 class TextureSet2D:

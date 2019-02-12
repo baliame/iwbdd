@@ -1,6 +1,9 @@
 from .shader import Shader, Program
 from OpenGL.GL import *
+from OpenGL.arrays.vbo import VBO
 from . import logger
+import numpy as np
+
 
 GSH_vtx = """
 #version 430
@@ -93,20 +96,12 @@ uniform vec4 colorize;
 uniform float tile_w, tile_h;
 
 void main() {
-    // out_color = vec4(in_screen_pos.x / (tile_w * 42), in_screen_pos.y / (tile_h * 32), 0, 1);
-    // return;
-
-    // float tex_idx = float(texelFetch(tile_idx, ivec2(41, 31), 0).r);
     float tx = in_screen_pos.x / tile_w;
     uint tx_i = uint(tx);
     float ty = in_screen_pos.y / tile_h;
     uint ty_i = uint(ty);
     uvec4 tex_idxu = texelFetch(tile_idx, ivec2(int(in_screen_pos.x / tile_w), int(in_screen_pos.y / tile_h)), 0);
     float tex_idx = float(tex_idxu.r);
-    // float tex_idx = texture(tile_idx, vec2(in_screen_pos.x / tile_w, in_screen_pos.y / tile_h)).r;
-
-    // out_color = vec4(vec3(tex_idxu.rgb), 1);
-    // return;
 
     vec4 spr = texture(tileset, vec3(tx - tx_i, ty - ty_i, tex_idx));
     vec4 scr = texture(screen, in_screen_uv);
@@ -114,8 +109,43 @@ void main() {
     spr.a *= colorize.a;
 
     vec3 clr = spr.a * spr.rgb + (1 - spr.a) * scr.rgb;
-    // vec3 clr = 0.5 * spr.rgb + 0.5 * scr.rgb;
     out_color = vec4(clr.rgb * colorize.rgb, 1);
+}
+
+""".strip()
+
+GSH_pix_terrain_no_blend = """
+#version 430
+
+layout(binding = 0) uniform sampler2DArray tileset;
+layout(binding = 1) uniform sampler2D screen;
+layout(binding = 2) uniform usampler2D tile_idx;
+
+layout(location = 1) in vec2 in_uv;
+layout(location = 2) in vec2 in_screen_uv;
+layout(location = 3) in vec2 in_screen_pos;
+
+layout(location = 0) out vec4 out_color;
+
+uniform float tile_w, tile_h;
+
+void main() {
+    float tx = in_screen_pos.x / tile_w;
+    uint tx_i = uint(tx);
+    float ty = in_screen_pos.y / tile_h;
+    uint ty_i = uint(ty);
+    uvec4 tex_idxu = texelFetch(tile_idx, ivec2(int(in_screen_pos.x / tile_w), int(in_screen_pos.y / tile_h)), 0);
+    float tex_idx = float(tex_idxu.r);
+
+    vec4 spr = texture(tileset, vec3(tx - tx_i, ty - ty_i, tex_idx));
+    vec4 scr = texture(screen, in_screen_uv);
+
+    if (spr.a > 0.5) {
+        out_color = vec4(spr.rgb, 1);
+    } else {
+        out_color = vec4(scr.rgb, 1);
+    }
+
 }
 
 """.strip()
@@ -137,15 +167,223 @@ void main() {
 }
 """.strip()
 
-_GSH_all = [(GL_VERTEX_SHADER, "GSH_vtx"), (GL_FRAGMENT_SHADER, "GSH_pix"), (GL_FRAGMENT_SHADER, "GSH_pix_sheet"), (GL_FRAGMENT_SHADER, "GSH_pix_terrain"), (GL_FRAGMENT_SHADER, "GSH_blit")]
-_GSH_progs = {"GSHP_render": {GL_VERTEX_SHADER: "GSH_vtx", GL_FRAGMENT_SHADER: "GSH_pix"}, "GSHP_render_sheet": {GL_VERTEX_SHADER: "GSH_vtx", GL_FRAGMENT_SHADER: "GSH_pix_sheet"}, "GSHP_render_terrain": {GL_VERTEX_SHADER: "GSH_vtx", GL_FRAGMENT_SHADER: "GSH_pix_terrain"}, "GSHP_blit": {GL_VERTEX_SHADER: "GSH_vtx", GL_FRAGMENT_SHADER: "GSH_blit"}}
+GSH_colorfill = """
+#version 430
+
+layout(location = 0) out vec4 out_color;
+
+uniform vec4 colorize;
+
+void main() {
+    out_color = vec4(colorize.rgb, 1);
+}
+""".strip()
+
+GSH_pix_hitboxgen = """
+#version 430
+
+layout(binding = 0) uniform sampler2DArray sprite;
+
+layout(location = 1) in vec2 in_uv;
+
+layout(location = 0) out vec4 out_color;
+
+uniform vec4 colorize;
+uniform float tex_idx;
+
+void main() {
+    vec4 spr = texture(sprite, vec3(in_uv, tex_idx));
+
+    if (spr.a > 0.5) {
+        out_color = vec4(colorize.rgb, 1);
+    } else {
+        out_color = vec4(0, 0, 0, 0);
+    }
+}
+
+""".strip()
+
+GSH_lens = """
+#version 430
+
+layout(binding = 1) uniform sampler2D screen;
+layout(binding = 2) uniform sampler2D background;
+
+layout(location = 1) in vec2 in_uv;
+layout(location = 2) in vec2 in_screen_uv;
+
+layout(location = 0) out vec4 out_color;
+
+void main() {
+    vec2 dist_uv = vec2(in_screen_uv.x + (in_uv.x - 0.5) * (in_uv.x - 0.5) * 0.2, in_screen_uv.y + (in_uv.y - 0.5) * (in_uv.y - 0.5) * 0.2);
+    vec4 scr = texture(screen, in_screen_uv);
+    vec4 bg = texture(background, dist_uv);
+    float r2 = in_uv.x * in_uv.x + in_uv.y * in_uv.y;
+    if (r2 > 1.05) {
+        out_color = scr;
+    }
+    else if (r2 >= 0.95) {
+        out_color = vec4(0, 0, 0, 1);
+    }
+    else {
+        out_color = bg;
+    }
+}
+
+""".strip()
+
+GSH_lens_off = """
+#version 430
+
+layout(binding = 1) uniform sampler2D screen;
+layout(binding = 2) uniform sampler2D background;
+
+layout(location = 1) in vec2 in_uv;
+layout(location = 2) in vec2 in_screen_uv;
+
+layout(location = 0) out vec4 out_color;
+
+void main() {
+    vec4 scr = texture(screen, in_screen_uv);
+    float r2 = in_uv.x * in_uv.x + in_uv.y * in_uv.y;
+    if (r2 > 1.05) {
+        out_color = scr;
+    }
+    else if (r2 >= 0.95) {
+        out_color = vec4(0, 0, 0, 1);
+    }
+    else {
+        out_color = scr;
+    }
+}
+
+""".strip()
+
+GSH_lens_coll = """
+#version 430
+
+layout(binding = 1) uniform sampler2D screen;
+layout(binding = 2) uniform sampler2D background;
+
+layout(location = 1) in vec2 in_uv;
+layout(location = 2) in vec2 in_screen_uv;
+
+layout(location = 0) out vec4 out_color;
+
+void main() {
+    vec4 scr = texture(screen, in_screen_uv);
+    float r2 = in_uv.x * in_uv.x + in_uv.y * in_uv.y;
+    if (r2 > 1.0) {
+        out_color = scr;
+    }
+    else {
+        out_color = vec4(128, 0, 0, 255);
+    }
+}
+
+""".strip()
+
+GSH_lens_semi = """
+#version 430
+
+layout(binding = 1) uniform sampler2D screen;
+layout(binding = 2) uniform sampler2D background;
+
+layout(location = 1) in vec2 in_uv;
+layout(location = 2) in vec2 in_screen_uv;
+
+layout(location = 0) out vec4 out_color;
+
+void main() {
+    vec4 scr = texture(screen, in_screen_uv);
+    if (in_uv.y < 0.45) {
+        out_color = scr;
+    } else if (in_uv.y < 0.55) {
+        out_color = vec4(0, 0, 0, 1);
+    } else {
+        vec2 dist_uv = vec2(in_screen_uv.x + (in_uv.x - 0.5) * (in_uv.x - 0.5) * 0.2, in_screen_uv.y + (in_uv.y - 0.5) * (in_uv.y - 0.5) * 0.2);
+        vec4 bg = texture(background, dist_uv);
+        float r2 = in_uv.x * in_uv.x + in_uv.y * in_uv.y;
+        if (r2 > 1.05) {
+            out_color = scr;
+        }
+        else if (r2 >= 0.95) {
+            out_color = vec4(0, 0, 0, 1);
+        }
+        else {
+            out_color = bg;
+        }
+    }
+}
+
+""".strip()
+
+GSH_lens_semi_coll = """
+#version 430
+
+layout(binding = 1) uniform sampler2D screen;
+layout(binding = 2) uniform sampler2D background;
+
+layout(location = 1) in vec2 in_uv;
+layout(location = 2) in vec2 in_screen_uv;
+
+layout(location = 0) out vec4 out_color;
+
+void main() {
+    vec4 scr = texture(screen, in_screen_uv);
+    if (in_uv.y < 0.5) {
+        out_color = scr;
+    } else {
+        float r2 = in_uv.x * in_uv.x + in_uv.y * in_uv.y;
+        if (r2 > 1.0) {
+            out_color = scr;
+        }
+        else {
+            out_color = vec4(128, 0, 0, 255);
+        }
+    }
+}
+
+""".strip()
+
+
+_GSH_all = [
+    (GL_VERTEX_SHADER, "GSH_vtx"),
+    (GL_FRAGMENT_SHADER, "GSH_pix"),
+    (GL_FRAGMENT_SHADER, "GSH_pix_sheet"),
+    (GL_FRAGMENT_SHADER, "GSH_pix_terrain"),
+    (GL_FRAGMENT_SHADER, "GSH_blit"),
+    (GL_FRAGMENT_SHADER, "GSH_pix_terrain_no_blend"),
+    (GL_FRAGMENT_SHADER, "GSH_colorfill"),
+    (GL_FRAGMENT_SHADER, "GSH_pix_hitboxgen"),
+    (GL_FRAGMENT_SHADER, "GSH_lens"),
+    (GL_FRAGMENT_SHADER, "GSH_lens_off"),
+    (GL_FRAGMENT_SHADER, "GSH_lens_coll"),
+    (GL_FRAGMENT_SHADER, "GSH_lens_semi"),
+    (GL_FRAGMENT_SHADER, "GSH_lens_semi_coll"),
+]
+_GSH_progs = {
+    "GSHP_render": {GL_VERTEX_SHADER: "GSH_vtx", GL_FRAGMENT_SHADER: "GSH_pix"},
+    "GSHP_render_sheet": {GL_VERTEX_SHADER: "GSH_vtx", GL_FRAGMENT_SHADER: "GSH_pix_sheet"},
+    "GSHP_render_terrain": {GL_VERTEX_SHADER: "GSH_vtx", GL_FRAGMENT_SHADER: "GSH_pix_terrain"},
+    "GSHP_render_terrain_no_blend": {GL_VERTEX_SHADER: "GSH_vtx", GL_FRAGMENT_SHADER: "GSH_pix_terrain_no_blend"},
+    "GSHP_blit": {GL_VERTEX_SHADER: "GSH_vtx", GL_FRAGMENT_SHADER: "GSH_blit"},
+    "GSHP_colorfill": {GL_VERTEX_SHADER: "GSH_vtx", GL_FRAGMENT_SHADER: "GSH_colorfill"},
+    "GSHP_hitboxgen": {GL_VERTEX_SHADER: "GSH_vtx", GL_FRAGMENT_SHADER: "GSH_pix_hitboxgen"},
+    "GSHP_lens": {GL_VERTEX_SHADER: "GSH_vtx", GL_FRAGMENT_SHADER: "GSH_lens"},
+    "GSHP_lens_off": {GL_VERTEX_SHADER: "GSH_vtx", GL_FRAGMENT_SHADER: "GSH_lens_off"},
+    "GSHP_lens_coll": {GL_VERTEX_SHADER: "GSH_vtx", GL_FRAGMENT_SHADER: "GSH_lens_coll"},
+    "GSHP_lens_semi": {GL_VERTEX_SHADER: "GSH_vtx", GL_FRAGMENT_SHADER: "GSH_lens"},
+    "GSHP_lens_semi_coll": {GL_VERTEX_SHADER: "GSH_vtx", GL_FRAGMENT_SHADER: "GSH_lens_semi_coll"},
+}
 GSH_compiled = {}
 GSH_programs = {}
 GSH_wasinit = False
+GSH_vaos = {}
 
 
 def GSH_init():
-    global _GSH_all, _GSH_progs, GSH_compiled, GSH_programs, GSH_wasinit
+    global _GSH_all, _GSH_progs, GSH_compiled, GSH_programs, GSH_wasinit, GSH_vaos
     if GSH_wasinit:
         return
     g = globals()
@@ -158,6 +396,14 @@ def GSH_init():
             p.attach(GSH_compiled[s])
         p.link()
         GSH_programs[prog] = p
+    GSH_vaos['unit'] = glGenVertexArrays(1)
+    glBindVertexArray(GSH_vaos['unit'])
+    vbo = VBO(np.array([0, 0, 1, 0, 0, 1, 1, 1], dtype='f'))
+    vbo.bind()
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, vbo)
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, vbo)
+    vbo.unbind()
+    glBindVertexArray(0)
     GSH_wasinit = True
 
 

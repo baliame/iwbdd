@@ -1,6 +1,5 @@
 from .common import eofc_read, lerp
 import struct
-import pygame
 from io import BytesIO
 from OpenGL.GL import *
 from PIL import Image
@@ -70,7 +69,6 @@ class Background:
             glEnableVertexAttribArray(1)
             glBindVertexArray(0)
         self.background_id = 0
-        self.image_surface = None
         if reader is not None:
             self.read_background_data(reader)
 

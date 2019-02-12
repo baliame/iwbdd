@@ -2,7 +2,6 @@ from PIL import Image, ImageFont, ImageDraw
 from .texture import Texture2D
 from collections import OrderedDict
 from .game_shaders import GSHp
-from .window import Window
 import numpy as np
 from OpenGL.GL import *
 from OpenGL.arrays.vbo import VBO
@@ -41,7 +40,11 @@ class Font:
         self.dirty = True
         self.draw_directives[draw_id] = (x, y, color, text)
 
-    def render(self, transparency):
+    def clear(self, draw_id):
+        if draw_id in self.draw_directives:
+            del self.draw_directives[draw_id]
+
+    def render(self, wnd, transparency):
         if self.dirty:
             self.text_layer = Image.new('RGBA', (self.wnd.w, self.wnd.h), (255, 255, 255, 0))
             Draw = ImageDraw.Draw(self.text_layer, 'RGBA')
@@ -51,7 +54,7 @@ class Font:
             self.tex.set_image(np.frombuffer(self.text_layer.transpose(Image.FLIP_TOP_BOTTOM).tobytes(), dtype=np.uint8), data_type=GL_UNSIGNED_BYTE, data_colors=GL_RGB if len(bands) == 3 else GL_RGBA, dest_colors=GL_RGBA, noresize=True)
             self.dirty = False
         with GSHp('GSHP_render') as prog:
-            Window.instance.setup_render(prog)
+            wnd.setup_render(prog)
             prog.uniform('model', Mat4.scaling(self.wnd.w, self.wnd.h, 1))
             prog.uniform('colorize', Vec4(1.0, 1.0, 1.0, 1.0))
             self.tex.bindtexunit(0)

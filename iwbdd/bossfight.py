@@ -1,8 +1,8 @@
 from .common import CollisionTest
 from .object import Object, ExplosionEffect, generate_rectangle_hitbox
 from .spritesheet import Spritesheet
+from .pygame_oo.window import Window
 import copy
-import pygame
 import glfw
 from .audio_data import Audio
 from random import choice, randint
@@ -50,7 +50,8 @@ class Barrier(BossfightObject):
     def __init__(self, screen, x=0, y=0, init_dict=None):
         super().__init__(screen, x, y, init_dict)
         self.hidden = True
-        self.hitbox = generate_rectangle_hitbox(24, 144)
+        self.hitbox_w = 24
+        self.hitbox_h = 144
         self.hitbox_type = CollisionTest.SOLID
         self.spritesheet = Spritesheet.spritesheets_byname['ss_boss_barrier-24-144.png']
         self.states = {
@@ -83,8 +84,7 @@ class Bossfight:
 
         self.dev_mode = False
 
-        self.font = pygame.font.SysFont('Courier New', 12)
-        ctrl.ml.add_render_callback(self.dev_render)
+        ctrl.ml.add_pre_render_callback(self.dev_render)
 
     def skip(self):
         if self.state == 1:
@@ -95,13 +95,12 @@ class Bossfight:
     def dev_render(self, wnd):
         if self.dev_mode and self.state > 0:
             p = self.boss.phases[self.boss.phase_idx]
-            draw_color = (0, 0, 0)
-            wnd.display.blit(self.font.render(p.__class__.phase_name, True, draw_color, 0), (0, 0))
+            Window.instance.font.draw("dev_boss_phase", p.__class__.phase_name, 0, 0, color=(0, 0, 0))
             if self.state > 1:
                 c_n = p.current_cycle[p.idx].__class__.cycle_el_name
                 n_c = p.next_cycle_element
-                wnd.display.blit(self.font.render("{0} [{1}]".format(c_n, n_c), True, draw_color, 0), (0, 16))
-                wnd.display.blit(self.font.render("{0}/{1}".format(self.boss.health, self.boss.initial_health), True, draw_color, 0), (0, 32))
+                Window.instance.font.draw("dev_boss_cycle", "{0} [{1}]".format(c_n, n_c), 0, 16, color=(0, 0, 0))
+                Window.instance.font.draw("dev_boss_health", "{0}/{1}".format(self.boss.health, self.boss.initial_health), 0, 32, color=(0, 0, 0))
 
     def attach_boss(self, boss):
         self.boss_template = boss
@@ -227,9 +226,9 @@ class Boss(BossfightObject):
 
     def create_explosion_on_self(self):
         dxmin = -24
-        dxmax = len(self.hitbox) - 24
+        dxmax = self.hitbox_w - 24
         dymin = -24
-        dymax = len(self.hitbox[0]) - 24
+        dymax = self.hitbox_h - 24
         e = ExplosionEffect(self.screen, self.x + randint(dxmin, dxmax), self.y + randint(dymin, dymax))
         e.start(self.fight_controller.ctrl)
 

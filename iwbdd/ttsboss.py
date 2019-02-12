@@ -87,6 +87,7 @@ class TTSBoss_Bracket(BossfightObject):
 
     @classmethod
     def precache(cls):
+        return
         if not TTSBoss_Bracket.spritesheet_init:
             ss = Spritesheet.spritesheets_byname["ss_object_ttsboss_objects-24-72.png"]
             TTSBoss_Bracket.spritesheet_init = True
@@ -435,6 +436,7 @@ class TTSBoss(Boss):
         self.color_frames = 10
         self.color_dir = 1
         self.color_state = 0
+        return
 
         for a in range(0, 255, 32):
             self.spritesheet.precache_variant(variant_alpha=a)

@@ -4,13 +4,13 @@ import struct
 import pygame
 from io import BytesIO
 import os.path as path
-# from pygame.locals import BLEND_RGB_MULT
 from PIL import Image
 from OpenGL.GL import *
 from .pygame_oo.texture import TextureSet2D
 from .pygame_oo.shader import Vec4, Mat4
 from .pygame_oo.game_shaders import GSHp
 from .pygame_oo.window import Window
+from .pygame_oo.framebuf import Framebuffer
 from OpenGL.arrays.vbo import VBO
 from .pygame_oo import logger
 
@@ -54,6 +54,7 @@ def pack_spritesheets_from_files(files, dest):
 class Spritesheet:
     spritesheets = {}
     spritesheets_byname = {}
+    hitbox_creator = None
 
     @staticmethod
     def find(tid):
@@ -96,7 +97,6 @@ class Spritesheet:
         self.cell_h = struct.unpack('<L', eofc_read(reader, 4))[0]
         data_len = struct.unpack('<L', eofc_read(reader, 4))[0]
         raw_png = eofc_read(reader, data_len)
-        # self.image_surface = pygame.image.load(BytesIO(raw_png)).convert_alpha()
         img_data = Image.open(BytesIO(raw_png)).transpose(Image.FLIP_TOP_BOTTOM)
         bands = img_data.getbands()
         xf = round(img_data.width / self.cell_w)
@@ -138,28 +138,18 @@ class Spritesheet:
             logger.log_draw()
             glBindVertexArray(0)
 
-#        variant_scale = 1 / self.variant_downscale
-#        variant_key = (self.variant_color, self.variant_alpha, self.variant_downscale)
-#        if variant_key not in self.variants:
-#            self.precache_variant(self.variant_color, self.variant_alpha, self.variant_downscale)
-#        target.blit(self.variants[variant_key], (draw_x, draw_y), pygame.Rect(int(x * self.cell_w * variant_scale), int(y * self.cell_h * variant_scale), int(self.cell_w * variant_scale), int(self.cell_h * variant_scale)))
+    def create_hitbox(self, x, y):
+        if Spritesheet.hitbox_creator is None:
+            Spritesheet.hitbox_creator = Framebuffer(self.cell_w, self.cell_h)
+        with Spritesheet.hitbox_creator:
+            with GSHp('GSHP_hitboxgen') as prog:
+                Window.instance.setup_render(prog)
 
-#    def make_hitbox(self, cell_x, cell_y, variant_downscale=1, alpha_threshold=1):
-#        temp = self.variant_downscale
-#        self.variant_downscale = variant_downscale
-#        vs = 1 / variant_downscale
-#        surf = pygame.Surface((int(self.cell_w * vs), int(self.cell_h * vs)), flags=pygame.SRCALPHA)
-#        self.draw_cell_to(surf, cell_x, cell_y, 0, 0)
-#        sa = pygame.surfarray.array_alpha(surf)
-#        cond = np.nonzero(sa)
-#        rmin = np.min(cond[0])
-#        rmax = np.max(cond[0])
-#        cmin = np.min(cond[1])
-#        cmax = np.max(cond[1])
-#        ox = -rmin
-#        oy = -cmin
-#        hitbox = sa[rmin:rmax, cmin:cmax]
-#        hitbox[hitbox < alpha_threshold] = 0
-#        hitbox[hitbox > 0] = 1
-#        self.variant_scale = temp
-#        return (hitbox, ox, oy)
+                tex_idx = float(x + self.stride * y)
+                prog.uniform('colorize', Vec4(1.0, 0.0, 0.0, 1.0))
+                prog.uniform('model', Mat4.scaling(self.cell_w, self.cell_h))
+                prog.uniform('tex_idx', tex_idx)
+                glBindVertexArray(self.vao)
+                glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
+                logger.log_draw()
+                glBindVertexArray(0)

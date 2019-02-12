@@ -1,7 +1,10 @@
 from .object import Object, EPType, generate_circle_hitbox, generate_semicircle_hitbox
 from .common import CollisionTest, SCREEN_SIZE_W, SCREEN_SIZE_H, COLLISIONTEST_PREVENTS_MOVEMENT
 import numpy as np
-import pygame
+from .pygame_oo.game_shaders import GSHp, GSH_vaos
+from .pygame_oo.shader import Mat4
+from .pygame_oo.window import Window
+from OpenGL.GL import *
 
 
 class LensParent(Object):
@@ -29,53 +32,23 @@ class ActivatableLens(LensParent):
         self.active = self.start_active
         self.trigger_group = 0
         super().__init__(screen, x, y, init_dict)
-        self.active_hitbox = generate_circle_hitbox(self.radius)
-        self.passive_hitbox = np.array([])
-        self.hitbox_type = CollisionTest.LENS
-        self.hitbox = self.passive_hitbox if not self.start_active else self.active_hitbox
-        self.active_surface = pygame.Surface((self.radius * 2 + 5, self.radius * 2 + 5), pygame.SRCALPHA)
-        self.passive_surface = pygame.Surface((self.radius * 2 + 5, self.radius * 2 + 5), pygame.SRCALPHA)
-        self.active_surface.fill((0, 0, 0, 0))
-        self.passive_surface.fill((0, 0, 0, 0))
-        pygame.draw.circle(self.active_surface, (0, 0, 0, 255), (self.radius + 3, self.radius + 3), self.radius + 3, 3)
-        pygame.draw.circle(self.passive_surface, (0, 0, 0, 255), (self.radius + 3, self.radius + 3), self.radius + 3, 3)
-        self.generate_distortion()
-        self.offset_x = -2
-        self.offset_y = -2
-
-    def generate_distortion(self):
-        return
-        bg = self.screen.background
-        basex = self.x + self.radius
-        basey = self.y + self.radius
-        with pygame.PixelArray(self.active_surface) as pa:
-            r2 = self.radius * self.radius
-            for x in range(self.radius * 2 + 5):
-                for y in range(self.radius * 2 + 5):
-                    relx = x - self.radius - 2
-                    rely = y - self.radius - 2
-                    d2 = relx * relx + rely * rely
-                    if d2 <= r2:
-                        col = bg.sample(basex, basey, SCREEN_SIZE_W, SCREEN_SIZE_H)
-                        pa[x, y] = (col[0], col[1], col[2], 255)
+        self.model = Mat4.scaling(self.radius * 2, self.radius * 2).translate(int(self.x) + self._offset_x, Window.instance.h - int(self.y) + self._offset_y)
+        self.draw_x_m = -7
+        self.draw_y_m = -7
 
     def tick(self, scr, ctrl):
         if (self.start_active and ctrl.trigger_group[self.trigger_group]) or (not self.start_active and not ctrl.trigger_group[self.trigger_group]):
             if self.active:
                 self.active = 0
-                self.hitbox = self.passive_hitbox
                 scr.objects_dirty = True
-                self.hbds_dirty = True
                 if scr == ctrl.player.screen:
-                    coll = scr.test_screen_collision(ctrl.player.x, ctrl.player.y, ctrl.player.hitbox)
+                    coll = scr.test_screen_collision(ctrl.player.x, ctrl.player.y, (ctrl.player.hitbox_w, ctrl.player.hitbox_h))
                     if coll[4][0] & COLLISIONTEST_PREVENTS_MOVEMENT:
                         ctrl.player.die()
         else:
             if not self.active:
                 self.active = 1
-                self.hitbox = self.active_hitbox
                 scr.objects_dirty = True
-                self.hbds_dirty = True
 
     def draw(self, wnd):
         ix = int(self.x)
@@ -83,10 +56,45 @@ class ActivatableLens(LensParent):
         if not self.hidden:
             draw_x = ix + self._offset_x
             draw_y = iy + self._offset_y
+            if draw_x != self.draw_x_m or draw_y != self.draw_y_m:
+                self.model = Mat4.scaling(self.radius * 2, self.radius * 2).translate(draw_x, wnd.h - draw_y)
+                self.draw_x_m = draw_x
+                self.draw_y_m = draw_y
+            prog_name = "GSHP_lens_off"
             if self.active:
-                wnd.display.blit(self.active_surface, (draw_x, draw_y))
-            else:
-                wnd.display.blit(self.passive_surface, (draw_x, draw_y))
+                prog_name = "GSHP_lens"
+            with GSHp(prog_name) as prog:
+                wnd.setup_render(prog)
+                prog.uniform('model', self.model)
+
+                wnd.fbo.bindtexunit(1)
+                self.screen.background.tex.bindtexunit(2)
+
+                glBindVertexArray(GSH_vaos['unit'])
+                glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
+                glBindVertexArray(0)
+
+    def draw_as_hitbox(self, wnd, color):
+        if self.hidden or not self.active:
+            return
+        ix = int(self.x)
+        iy = int(self.y)
+        draw_x = ix + self._offset_x
+        draw_y = iy + self._offset_y
+        if draw_x != self.draw_x_m or draw_y != self.draw_y_m:
+            self.model = Mat4.scaling(self.radius * 2, self.radius * 2).translate(draw_x, wnd.h - draw_y)
+            self.draw_x_m = draw_x
+            self.draw_y_m = draw_y
+        with GSHp("GSHP_lens_coll") as prog:
+            wnd.setup_render(prog)
+            prog.uniform('model', self.model)
+
+            wnd.fbo.bindtexunit(1)
+            self.screen.background.tex.bindtexunit(2)
+
+            glBindVertexArray(GSH_vaos['unit'])
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
+            glBindVertexArray(0)
 
     def object_editor_draw(self, wnd):
         val = self.active
@@ -96,16 +104,7 @@ class ActivatableLens(LensParent):
 
     def reload_from_editor(self):
         super().reload_from_editor()
-        self.active_hitbox = generate_circle_hitbox(self.radius)
-        self.passive_hitbox = np.array([])
-        self.hitbox = self.passive_hitbox if not self.start_active else self.active_hitbox
-        self.active_surface = pygame.Surface((self.radius * 2 + 5, self.radius * 2 + 5), pygame.SRCALPHA)
-        self.passive_surface = pygame.Surface((self.radius * 2 + 5, self.radius * 2 + 5), pygame.SRCALPHA)
-        self.active_surface.fill((0, 0, 0, 0))
-        self.passive_surface.fill((0, 0, 0, 0))
-        pygame.draw.circle(self.active_surface, (0, 0, 0, 255), (self.radius + 3, self.radius + 3), self.radius + 3, 5)
-        pygame.draw.circle(self.passive_surface, (0, 0, 0, 255), (self.radius + 3, self.radius + 3), self.radius + 3, 5)
-        self.generate_distortion()
+        self.model = Mat4.scaling(self.radius * 2, self.radius * 2).translate(draw_x, Window.instance.h - draw_y)
         ActivatableLens.editor_frame_size = (2 * self.radius + 5, 2 * self.radius + 5)
 
     def on_editor_select(self):
@@ -135,34 +134,8 @@ class MovingLens(LensParent):
         super().__init__(screen, x, y, init_dict)
         self.x = self.source[0] + int(self.t * (self.destination[0] - self.source[0]))
         self.y = self.source[1] + int(self.t * (self.destination[1] - self.source[1]))
-        self.hitbox = generate_semicircle_hitbox(self.radius)
-        self.active_surface = pygame.Surface((self.radius * 2 + 5, self.radius + 5), pygame.SRCALPHA)
-        self.active_surface.fill((0, 0, 255, 0))
-        pygame.draw.circle(self.active_surface, (0, 0, 255, 255), (self.radius + 3, self.radius + 3), self.radius + 3, 3)
-        pygame.draw.line(self.active_surface, (0, 0, 255, 255), (0, self.radius + 4), (self.radius * 2 + 5, self.radius + 4), 3)
-        self.generate_distortion()
-        self.editor_surface = self.active_surface.copy()
-        sa = pygame.surfarray.pixels_alpha(self.editor_surface)
-        sa[sa > 0] = 128
-        self.offset_x = -2
-        self.offset_y = -2
+        self.model = Mat4.scaling(self.radius * 2, self.radius * 2).translate(int(self.x) + self._offset_x, Window.instance.h - int(self.y) + self._offset_y)
         self.editor_drawing = False
-
-    def generate_distortion(self):
-        return
-        bg = self.screen.background
-        basex = self.x + self.radius
-        basey = self.y + self.radius
-        with pygame.PixelArray(self.active_surface) as pa:
-            r2 = self.radius * self.radius
-            for x in range(self.radius * 2 + 5):
-                for y in range(self.radius + 3):
-                    relx = x - self.radius - 2
-                    rely = y - self.radius - 2
-                    d2 = relx * relx + rely * rely
-                    if d2 <= r2:
-                        col = bg.sample(basex, basey, SCREEN_SIZE_W, SCREEN_SIZE_H)
-                        pa[x, y] = (col[0], col[1], col[2], 255)
 
     def tick(self, scr, ctrl):
         if self.forward:
@@ -183,7 +156,7 @@ class MovingLens(LensParent):
         self.y = ny
         scr.objects_dirty = True
         if scr == ctrl.player.screen:
-            coll = scr.test_screen_collision(ctrl.player.x, ctrl.player.y, ctrl.player.hitbox)
+            coll = scr.test_screen_collision(ctrl.player.x, ctrl.player.y, (ctrl.player.hitbox_w, ctrl.player.hitbox_h))
             if coll[4][0] & COLLISIONTEST_PREVENTS_MOVEMENT:
                 ctrl.player.die()
 
@@ -193,7 +166,34 @@ class MovingLens(LensParent):
         if not self.hidden:
             draw_x = ix + self._offset_x
             draw_y = iy + self._offset_y
-            wnd.display.blit(self.active_surface if not self.editor_drawing else self.editor_surface, (draw_x, draw_y))
+            self.model = Mat4.scaling(self.radius * 2, self.radius * 2).translate(draw_x, wnd.h - draw_y)
+            with GSHp("GSHP_lens_semi") as prog:
+                wnd.setup_render(prog)
+                prog.uniform('model', self.model)
+
+                wnd.fbo.bindtexunit(1)
+                self.screen.background.tex.bindtexunit(2)
+
+                glBindVertexArray(GSH_vaos['unit'])
+                glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
+                glBindVertexArray(0)
+
+    def draw_as_hitbox(self, wnd, color):
+        if self.hidden:
+            return
+        ix = int(self.x)
+        iy = int(self.y)
+        draw_x = ix + self._offset_x
+        draw_y = iy + self._offset_y
+        self.model = Mat4.scaling(self.radius * 2, self.radius * 2).translate(draw_x, wnd.h - draw_y)
+        with GSHp("GSHP_lens_semi_coll") as prog:
+            wnd.setup_render(prog)
+            prog.uniform('model', self.model)
+            wnd.fbo.bindtexunit(1)
+            self.screen.background.tex.bindtexunit(2)
+            glBindVertexArray(GSH_vaos['unit'])
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
+            glBindVertexArray(0)
 
     def object_editor_draw(self, wnd):
         cx = self.x
@@ -211,23 +211,15 @@ class MovingLens(LensParent):
         self.y = self.destination[1]
         self.draw(wnd)
         self.editor_drawing = False
-        pygame.draw.line(wnd.display, (0, 255, 0), (self.source[0] + self.radius + 3, self.source[1] + self.radius + 3), (self.destination[0] + self.radius + 3, self.destination[1] + self.radius + 3))
+        wnd.graphics.line(self.source[0] + self.radius + 3, self.source[1] + self.radius + 3, self.destination[0] + self.radius + 3, self.destination[1] + self.radius + 3, (0, 255, 0, 255))
         self.x = cx
         self.y = cy
 
     def reload_from_editor(self):
         super().reload_from_editor()
-        self.hitbox = generate_semicircle_hitbox(self.radius)
-        self.active_surface = pygame.Surface((self.radius * 2 + 5, self.radius + 4), pygame.SRCALPHA)
-        self.active_surface.fill((0, 0, 255, 0))
-        pygame.draw.circle(self.active_surface, (0, 0, 255, 255), (self.radius + 3, self.radius + 3), self.radius + 3, 3)
-        pygame.draw.line(self.active_surface, (0, 0, 255, 255), (0, self.radius + 4), (self.radius * 2 + 5, self.radius + 4), 3)
-        self.generate_distortion()
-        self.editor_surface = self.active_surface.copy()
-        sa = pygame.surfarray.pixels_alpha(self.editor_surface)
-        sa[sa > 0] = 128
         self.x = self.source[0] + int(self.t * (self.destination[0] - self.source[0]))
         self.y = self.source[1] + int(self.t * (self.destination[1] - self.source[1]))
+        self.model = Mat4.scaling(self.radius * 2, self.radius * 2).translate(draw_x, wnd.h - draw_y)
         ActivatableLens.editor_frame_size = (2 * self.radius + 5, self.radius + 4)
 
     def on_editor_select(self):

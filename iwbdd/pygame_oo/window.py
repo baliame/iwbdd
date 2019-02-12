@@ -2,7 +2,9 @@ from OpenGL.GL import *
 import glfw
 from .framebuf import Framebuffer
 from .shader import Mat4
+from .game_shaders import GSH_init
 from .font import Font
+from .graphics import Graphics
 
 
 class Window:
@@ -29,8 +31,10 @@ class Window:
 
         self.glw = glfw.create_window(w, h, title, None, None)
         glfw.make_context_current(self.glw)
-        self.fbo = Framebuffer(w, h, self, name='Window alpha buffer')
+        GSH_init()
+        self.fbo = Framebuffer(w, h, name='Window alpha buffer')
         self.font = Font(self, 'arial.ttf')
+        self.graphics = Graphics(self)
         self.view = Mat4.scaling(2.0 / viewport_w, 2.0 / viewport_h, 1).translate(-1, -1)
         self.full_view = Mat4.scaling(2.0 / w, 2.0 / h, 1).translate(-1, -1)
         glDisable(GL_DEPTH_TEST)
@@ -51,12 +55,29 @@ class Window:
     def use_full_viewport(self):
         glViewport(0, 0, self.w, self.h)
 
-    def setup_render(self, prog):
+    def setup_render(self, prog, target_fbo=None):
         if prog is None:
             raise RuntimeError('setup_render called with none prog')
-        self.fbo.new_render_pass()
-        self.fbo.bindtexunit(1)
+        if Framebuffer.bound is not None:
+            Framebuffer.bound.new_render_pass()
+            Framebuffer.bound.bindtexunit(1)
         prog.uniform('view', self.view)
+
+    def pre_blit(self):
+        with self.fbo as fbo:
+            self.graphics.render(self, fbo)
+            self.font.render(self, fbo)
+
+    def __enter__(self):
+        self.use_full_viewport()
+        glClearColor(0.0, 0.0, 0.0, 1.0)
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+        self.fbo.new_render_pass(True)
+        self.fbo.__enter__()
+
+    def __exit__(self, *args):
+        self.fbo.__exit__(*args)
+        self.fbo.blit_to_window()
 
 
 class WindowSection(Window):

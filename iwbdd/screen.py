@@ -1,15 +1,16 @@
 from enum import IntEnum, auto
 import struct
-import pygame
 from .background import Background
 from .tileset import Tileset
 from .common import eofc_read, is_reader_stream, CollisionTest, COLLISIONTEST_PREVENTS_MOVEMENT, SCREEN_SIZE_W, SCREEN_SIZE_H, COLLISIONTEST_COLORS
 from .object_importer import read_object
-from .object import ExistingSurfaceWrapper
+from .pygame_oo.window import Window
 from .pygame_oo.texture import Texture2D
+from .pygame_oo.framebuf import Framebuffer
 import copy
 from OpenGL.GL import *
 import numpy as np
+
 
 class Collision(IntEnum):
     PASSABLE = 0
@@ -65,35 +66,6 @@ class Screen:
     SCREEN_W = 42
     SCREEN_H = 32
 
-    collision_overlays = {
-        Collision.PASSABLE: lambda tgt, x, y: True,
-        Collision.SOLID_TILE: lambda tgt, x, y: pygame.draw.rect(tgt, COLLISIONTEST_COLORS[CollisionTest.SOLID], pygame.Rect(x, y, Tileset.TILE_W, Tileset.TILE_H)),
-        Collision.SOLID_HALF_DOWN: lambda tgt, x, y: pygame.draw.rect(tgt, COLLISIONTEST_COLORS[CollisionTest.SOLID], pygame.Rect(x, y + Tileset.TILE_H / 2, Tileset.TILE_W, Tileset.TILE_H / 2)),
-        Collision.SOLID_HALF_UP: lambda tgt, x, y: pygame.draw.rect(tgt, COLLISIONTEST_COLORS[CollisionTest.SOLID], pygame.Rect(x, y, Tileset.TILE_W, Tileset.TILE_H / 2)),
-        Collision.SOLID_SLOPE_UPLEFT: lambda tgt, x, y: pygame.draw.polygon(tgt, COLLISIONTEST_COLORS[CollisionTest.SOLID], [(x, y), (x + Tileset.TILE_W - 1, y + Tileset.TILE_H - 1), (x, y + Tileset.TILE_H - 1)]),
-        Collision.SOLID_SLOPE_UPRIGHT: lambda tgt, x, y: pygame.draw.polygon(tgt, COLLISIONTEST_COLORS[CollisionTest.SOLID], [(x + Tileset.TILE_W - 1, y), (x, y + Tileset.TILE_H - 1), (x + Tileset.TILE_W - 1, y + Tileset.TILE_H - 1)]),
-        Collision.DEADLY_TILE: lambda tgt, x, y: pygame.draw.rect(tgt, COLLISIONTEST_COLORS[CollisionTest.DEADLY], pygame.Rect(x, y, Tileset.TILE_W, Tileset.TILE_H)),
-        Collision.DEADLY_SPIKE_UP: lambda tgt, x, y: pygame.draw.polygon(tgt, COLLISIONTEST_COLORS[CollisionTest.DEADLY], [(x, y + Tileset.TILE_H - 1), (x + Tileset.TILE_W / 2 - 1, y), (x + Tileset.TILE_W / 2, y), (x + Tileset.TILE_W - 1, y + Tileset.TILE_H - 1)]),
-        Collision.DEADLY_SPIKE_DOWN: lambda tgt, x, y: pygame.draw.polygon(tgt, COLLISIONTEST_COLORS[CollisionTest.DEADLY], [(x, y), (x + Tileset.TILE_W / 2 - 1, y + Tileset.TILE_H - 1), (x + Tileset.TILE_W / 2, y + Tileset.TILE_H - 1), (x + Tileset.TILE_W - 1, y)]),
-        Collision.DEADLY_SPIKE_LEFT: lambda tgt, x, y: pygame.draw.polygon(tgt, COLLISIONTEST_COLORS[CollisionTest.DEADLY], [(x, y), (x + Tileset.TILE_W - 1, y + Tileset.TILE_H / 2 - 1), (x + Tileset.TILE_W - 1, y + Tileset.TILE_H / 2), (x, y + Tileset.TILE_H - 1)]),
-        Collision.DEADLY_SPIKE_RIGHT: lambda tgt, x, y: pygame.draw.polygon(tgt, COLLISIONTEST_COLORS[CollisionTest.DEADLY], [(x + Tileset.TILE_W - 1, y), (x, y + Tileset.TILE_H / 2 - 1), (x, y + Tileset.TILE_H / 2), (x + Tileset.TILE_W - 1, y + Tileset.TILE_H - 1)]),
-        Collision.SOLID_HALF_UP_DEADLY_HALF_DOWN: lambda tgt, x, y: pygame.draw.rect(tgt, COLLISIONTEST_COLORS[CollisionTest.SOLID], pygame.Rect(x, y, Tileset.TILE_W, Tileset.TILE_H / 2)) and pygame.draw.rect(tgt, COLLISIONTEST_COLORS[CollisionTest.DEADLY], pygame.Rect(x, y + Tileset.TILE_H / 2, Tileset.TILE_W, Tileset.TILE_H / 2)),
-        Collision.SOLID_HALF_DOWN_DEADLY_HALF_UP: lambda tgt, x, y: pygame.draw.rect(tgt, COLLISIONTEST_COLORS[CollisionTest.DEADLY], pygame.Rect(x, y, Tileset.TILE_W, Tileset.TILE_H / 2)) and pygame.draw.rect(tgt, COLLISIONTEST_COLORS[CollisionTest.SOLID], pygame.Rect(x, y + Tileset.TILE_H / 2, Tileset.TILE_W, Tileset.TILE_H / 2)),
-        Collision.SOLID_HALF_LEFT_DEADLY_HALF_RIGHT: lambda tgt, x, y: pygame.draw.rect(tgt, COLLISIONTEST_COLORS[CollisionTest.SOLID], pygame.Rect(x, y, Tileset.TILE_W / 2, Tileset.TILE_H)) and pygame.draw.rect(tgt, COLLISIONTEST_COLORS[CollisionTest.DEADLY], pygame.Rect(x + Tileset.TILE_W / 2 - 1, y, Tileset.TILE_W / 2, Tileset.TILE_H)),
-        Collision.SOLID_HALF_RIGHT_DEADLY_HALF_LEFT: lambda tgt, x, y: pygame.draw.rect(tgt, COLLISIONTEST_COLORS[CollisionTest.DEADLY], pygame.Rect(x, y, Tileset.TILE_W / 2, Tileset.TILE_H)) and pygame.draw.rect(tgt, COLLISIONTEST_COLORS[CollisionTest.SOLID], pygame.Rect(x + Tileset.TILE_W / 2 - 1, y, Tileset.TILE_W / 2, Tileset.TILE_H)),
-        Collision.CONVEYOR_EAST_SINGLE_SPEED: lambda tgt, x, y: pygame.draw.rect(tgt, COLLISIONTEST_COLORS[CollisionTest.CONVEYOR_EAST_SINGLE_SPEED], pygame.Rect(x, y, Tileset.TILE_W, Tileset.TILE_H)) and pygame.draw.polygon(tgt, COLLISIONTEST_COLORS[CollisionTest.SOLID], [(x + 2, y + 2), (x + Tileset.TILE_W - 3, y + Tileset.TILE_H / 2 - 1), (x + Tileset.TILE_W - 3, y + Tileset.TILE_H / 2), (x + 2, y + Tileset.TILE_H - 3)]),
-        Collision.CONVEYOR_NORTH_SINGLE_SPEED: lambda tgt, x, y: pygame.draw.rect(tgt, COLLISIONTEST_COLORS[CollisionTest.CONVEYOR_NORTH_SINGLE_SPEED], pygame.Rect(x, y, Tileset.TILE_W, Tileset.TILE_H)) and pygame.draw.polygon(tgt, COLLISIONTEST_COLORS[CollisionTest.SOLID], [(x + 2, y + Tileset.TILE_H - 3), (x + Tileset.TILE_W / 2 - 1, y + 2), (x + Tileset.TILE_W / 2, y + 2), (x + Tileset.TILE_W - 3, y + Tileset.TILE_H - 3)]),
-        Collision.CONVEYOR_WEST_SINGLE_SPEED: lambda tgt, x, y: pygame.draw.rect(tgt, COLLISIONTEST_COLORS[CollisionTest.CONVEYOR_WEST_SINGLE_SPEED], pygame.Rect(x, y, Tileset.TILE_W, Tileset.TILE_H)) and pygame.draw.polygon(tgt, COLLISIONTEST_COLORS[CollisionTest.SOLID], [(x + Tileset.TILE_W - 3, y + 2), (x + 2, y + Tileset.TILE_H / 2 - 1), (x + 2, y + Tileset.TILE_H / 2), (x + Tileset.TILE_W - 3, y + Tileset.TILE_H - 3)]),
-        Collision.CONVEYOR_SOUTH_SINGLE_SPEED: lambda tgt, x, y: pygame.draw.rect(tgt, COLLISIONTEST_COLORS[CollisionTest.CONVEYOR_SOUTH_SINGLE_SPEED], pygame.Rect(x, y, Tileset.TILE_W, Tileset.TILE_H)) and pygame.draw.polygon(tgt, COLLISIONTEST_COLORS[CollisionTest.SOLID], [(x + 2, y + 2), (x + Tileset.TILE_W / 2 - 1, y + Tileset.TILE_H - 3), (x + Tileset.TILE_W / 2, y + Tileset.TILE_H - 3), (x + Tileset.TILE_W - 3, y + 2)]),
-        Collision.SOLID_HALF_LEFT: lambda tgt, x, y: pygame.draw.rect(tgt, COLLISIONTEST_COLORS[CollisionTest.SOLID], pygame.Rect(x, y, Tileset.TILE_W / 2, Tileset.TILE_H)),
-        Collision.SOLID_HALF_RIGHT: lambda tgt, x, y: pygame.draw.rect(tgt, COLLISIONTEST_COLORS[CollisionTest.SOLID], pygame.Rect(x + Tileset.TILE_W / 2, y, Tileset.TILE_W / 2, Tileset.TILE_H)),
-        Collision.BOSSFIGHT_INIT_TRIGGER: lambda tgt, x, y: pygame.draw.rect(tgt, COLLISIONTEST_COLORS[CollisionTest.BOSSFIGHT_INIT_TRIGGER], pygame.Rect(x, y, Tileset.TILE_W, Tileset.TILE_H)),
-        Collision.SOLID_BEAM_UPRIGHT_PART_1: lambda tgt, x, y: pygame.draw.polygon(tgt, COLLISIONTEST_COLORS[CollisionTest.SOLID], [(x, y + Tileset.TILE_H - 1), (x, y + Tileset.TILE_H / 2 - 1), (x + Tileset.TILE_W / 2 - 1, y), (x + Tileset.TILE_W - 1, y)]),
-        Collision.SOLID_BEAM_UPRIGHT_PART_2: lambda tgt, x, y: pygame.draw.polygon(tgt, COLLISIONTEST_COLORS[CollisionTest.SOLID], [(x + Tileset.TILE_W - 1, y + Tileset.TILE_H - 1), (x + Tileset.TILE_W - 1, y + Tileset.TILE_H / 2), (x + Tileset.TILE_W / 2, y + Tileset.TILE_H - 1)]),
-        Collision.SOLID_BEAM_UPLEFT_PART_1: lambda tgt, x, y: pygame.draw.polygon(tgt, COLLISIONTEST_COLORS[CollisionTest.SOLID], [(x, y), (x + Tileset.TILE_W / 2 - 1, y), (x + Tileset.TILE_W - 1, y + Tileset.TILE_H / 2), (x + Tileset.TILE_W - 1, y + Tileset.TILE_H - 1)]),
-        Collision.SOLID_BEAM_UPLEFT_PART_2: lambda tgt, x, y: pygame.draw.polygon(tgt, COLLISIONTEST_COLORS[CollisionTest.SOLID], [(x, y + Tileset.TILE_H - 1), (x, y + Tileset.TILE_H / 2 + 1), (x + Tileset.TILE_W / 2 - 2, y + Tileset.TILE_H - 1)]),
-    }
-
     collision_test_flags = {
         0xFF0000: CollisionTest.DEADLY,
         0xFE0000: CollisionTest.BOSS,
@@ -107,6 +79,8 @@ class Screen:
         0x808000: CollisionTest.BOSSFIGHT_INIT_TRIGGER,
     }
 
+    CollisionBuffer = None
+
     def __init__(self, world, tile_data=None):
         self.world = world
         self.version = 1
@@ -117,9 +91,6 @@ class Screen:
         self.background = None
         self.dirty = True
         self.dirty_collisions = True
-        self.pre_rendered_unscaled_collisions = None
-        self.prus_with_objects = None
-        self.pre_rendered_collisions = None
         self.transitions = (0, 0, 0, 0)
         self.flags = 0
         tile_tuple = tuple([0 for i in range(Layer.LAYER_COUNT * 2 + 1)])
@@ -135,6 +106,13 @@ class Screen:
             self.tileids[layer] = Texture2D(Screen.SCREEN_W, Screen.SCREEN_H, np.zeros((Screen.SCREEN_H, Screen.SCREEN_W), dtype=np.uint32), arr_type=GL_UNSIGNED_INT, arr_colors=GL_RED_INTEGER, dest_colors=GL_R32UI, magf=GL_NEAREST, minf=GL_NEAREST)
         if tile_data is not None:
             self.load_tile_data(tile_data)
+        dim = (Screen.SCREEN_W * Tileset.TILE_W, Screen.SCREEN_H * Tileset.TILE_H)
+        if Screen.CollisionBuffer is None:
+            Screen.CollisionBuffer = Framebuffer(dim[0], dim[1], name='Screen collision buffer')
+        self.collids = Texture2D(Screen.SCREEN_W, Screen.SCREEN_H, np.zeros((Screen.SCREEN_H, Screen.SCREEN_W), dtype=np.uint32), arr_type=GL_UNSIGNED_INT, arr_colors=GL_RED_INTEGER, dest_colors=GL_R32UI, magf=GL_NEAREST, minf=GL_NEAREST)
+        self.terrain_collisions = Texture2D(dim[0], dim[1], np.zeros(dim[0] * dim[1] * 4, dtype='f'), arr_type=GL_FLOAT, arr_colors=GL_RGBA, dest_colors=GL_RGBA, magf=GL_NEAREST, minf=GL_NEAREST)
+        self.all_collisions = Texture2D(dim[0], dim[1], np.zeros(dim[0] * dim[1] * 4, dtype='f'), arr_type=GL_FLOAT, arr_colors=GL_RGBA, dest_colors=GL_RGBA, magf=GL_NEAREST, minf=GL_NEAREST)
+        self.terrain_collision_data = []
 
     def reset_to_initial_state(self):
         self.objects = []
@@ -341,17 +319,19 @@ class Screen:
 
     def render_to_window(self, wnd, layer=None):
         if self.dirty:
-            for layer in range(Layer.LAYER_COUNT):
+            for l1 in range(Layer.LAYER_COUNT):
+                if layer is not None and l1 != layer:
+                    continue
                 tile_idx = np.zeros((Screen.SCREEN_H, Screen.SCREEN_W), dtype=np.uint32)
                 for y in range(Screen.SCREEN_H):
                     for x in range(Screen.SCREEN_W):
-                        tx, ty = (self.tiles[y][x][2 * layer], self.tiles[y][x][1 + 2 * layer])
+                        tx, ty = (self.tiles[y][x][2 * l1], self.tiles[y][x][1 + 2 * l1])
                         tile_idx[Screen.SCREEN_H - (y + 1)][x] = self.world.tileset.stride * ty + tx
-                self.tileids[layer].set_image(tile_idx, GL_UNSIGNED_INT, GL_RED_INTEGER, dest_colors=GL_R32UI, debug=True, noresize=True)
+                self.tileids[l1].set_image(tile_idx, GL_UNSIGNED_INT, GL_RED_INTEGER, dest_colors=GL_R32UI, debug=True, noresize=True)
                 self.dirty = False
         self.background.draw(0, 0, wnd.w, wnd.h)
-        for layer in LayerDrawOrder:
-            self.world.tileset.draw_full_screen(0, 0, wnd.w, wnd.h, wnd.fbo, self.tileids[int(layer)])
+        for l2 in LayerDrawOrder:
+            self.world.tileset.draw_full_screen(0, 0, wnd.w, wnd.h, wnd.fbo, self.tileids[int(l2)])
         self.render_objects(wnd)
 
     def render_objects(self, wnd):
@@ -365,136 +345,133 @@ class Screen:
     def render_objects_hitboxes(self, wnd):
         for obj in self.objects:
             if obj.hitbox_type in COLLISIONTEST_COLORS:
-                obj.draw_as_hitbox(wnd, COLLISIONTEST_COLORS[obj.hitbox_type])
+                obj.draw_as_hitbox(wnd, fbo, COLLISIONTEST_COLORS[obj.hitbox_type])
 
     def ensure_unscaled_collisions(self):
-        if self.dirty_collisions or self.pre_rendered_unscaled_collisions is None:
-            if self.pre_rendered_unscaled_collisions is None:
-                self.pre_rendered_unscaled_collisions = pygame.Surface((SCREEN_SIZE_W, SCREEN_SIZE_H))
-            self.pre_rendered_unscaled_collisions.fill((255, 255, 255))
+        if self.dirty_collisions:
+            tile_idx = np.zeros((Screen.SCREEN_H, Screen.SCREEN_W), dtype=np.uint32)
             for y in range(Screen.SCREEN_H):
                 for x in range(Screen.SCREEN_W):
-                    tile = self.tiles[y][x]
-                    dest_x = x * Tileset.TILE_W
-                    dest_y = y * Tileset.TILE_H
-                    Screen.collision_overlays[Collision(tile[-1])](self.pre_rendered_unscaled_collisions, dest_x, dest_y)
+                    collid = self.tiles[y][x][-1]
+                    tile_idx[Screen.SCREEN_H - (y + 1)][x] = collid
+            self.collids.set_image(tile_idx, GL_UNSIGNED_INT, GL_RED_INTEGER, dest_colors=GL_R32UI, debug=True, noresize=True)
+            with Screen.CollisionBuffer as fbo:
+                fbo.use_external_texture(self.terrain_collisions)
+                fbo.new_render_pass(True)
+                Tileset.collision_tileset.draw_as_collision(0, 0, fbo.w, fbo.h, fbo, self.collids)
+            self.terrain_collisions.bindtexunit(0)
+            self.terrain_collision_data = glGetTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_UNSIGNED_BYTE, outputType=list)
             self.dirty_collisions = False
             return True
         return False
 
     def generate_object_collisions(self):
         self.ensure_unscaled_collisions()
-        if self.objects_dirty or self.prus_with_objects is None:
-            self.prus_with_objects = self.pre_rendered_unscaled_collisions.copy()
-            sw = ExistingSurfaceWrapper(self.prus_with_objects)
-            for obj in self.objects:
-                if obj.hitbox_type in COLLISIONTEST_COLORS:
-                    obj.draw_as_hitbox(sw, COLLISIONTEST_COLORS[obj.hitbox_type])
+        if self.objects_dirty:
+            with Screen.CollisionBuffer as fbo:
+                glCopyImageSubData(self.terrain_collisions.texid, GL_TEXTURE_2D, 0, 0, 0, 0, self.all_collisions.texid, GL_TEXTURE_2D, 0, 0, 0, 0, self.terrain_collisions.w, self.terrain_collisions.h, 1)
+                fbo.use_external_texture(self.all_collisions)
+                for obj in self.objects:
+                    if obj.hitbox_type in COLLISIONTEST_COLORS:
+                        obj.draw_as_hitbox(Window.instance, COLLISIONTEST_COLORS[obj.hitbox_type])
+            self.all_collisions.bindtexunit(0)
+            self.all_collision_data = glGetTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_UNSIGNED_BYTE, outputType=list)
             self.objects_dirty = False
 
     def access_collision(self):
         self.generate_object_collisions()
-        return pygame.PixelArray(self.prus_with_objects)
+        return self.all_collision_data
 
+    # hitbox: (w, h)
     # coll: (flags, solid count, solid min yo, solid max yo) [E, N, W, S, overlap]
     def test_screen_collision(self, x, y, hitbox, extra_flags=None):
         x = int(x)
         y = int(y)
-        w = len(hitbox)
-        h = len(hitbox[0])
+        w = hitbox[0]
+        h = hitbox[1]
         coll = [(0, 0, -1, -1), (0, 0, -1, -1), (0, 0, -1, -1), (0, 0, -1, -1), (0, 0, -1, -1)]
         cap = COLLISIONTEST_ALL_FLAGS
-        with self.access_collision() as pixels:
-            for yo in range(h):
-                cy = y + yo
-                for xo in range(w):
-                    if hitbox[xo, yo]:
-                        cx = x + xo
-                        sat = 0
-                        for cxo, cyo, idx in [(1, 0, 0), (0, -1, 1), (-1, 0, 2), (0, 1, 3), (0, 0, 4)]:
-                            try:
-                                if cx + cxo < 0 or cy + cyo < 0:
-                                    raise IndexError
-                                px = pixels[cx + cxo, cy + cyo]
-                                if px in Screen.collision_test_flags or (extra_flags is not None and px in extra_flags):
-                                    flag = Screen.collision_test_flags[px]
-                                    coll[idx] = (coll[idx][0] | Screen.collision_test_flags[px], coll[idx][1], coll[idx][2], coll[idx][3])
-                                    if flag & COLLISIONTEST_PREVENTS_MOVEMENT:
-                                        cnt = coll[idx][1] + 1
-                                        min_yo = yo + cyo if coll[idx][2] == -1 or coll[idx][2] > yo + cyo else coll[idx][2]
-                                        max_yo = yo + cyo if coll[idx][3] == -1 or coll[idx][3] < yo + cyo else coll[idx][3]
-                                        coll[idx] = (coll[idx][0], cnt, min_yo, max_yo)
-                            except IndexError:
-                                flag = 0
-                                if cx + cxo < 0:
-                                    if self.transitions[2]:
-                                        flag |= CollisionTest.TRANSITION_WEST
-                                    else:
-                                        flag |= CollisionTest.SOLID
-                                elif cy + cyo < 0:
-                                    if self.transitions[1]:
-                                        flag |= CollisionTest.TRANSITION_NORTH
-                                    else:
-                                        flag |= CollisionTest.SOLID
-                                elif cx + cxo >= SCREEN_SIZE_W:
-                                    if self.transitions[0]:
-                                        flag |= CollisionTest.TRANSITION_EAST
-                                    else:
-                                        flag |= CollisionTest.SOLID
-                                elif cy + cyo >= SCREEN_SIZE_H:
-                                    if self.transitions[3]:
-                                        flag |= CollisionTest.TRANSITION_SOUTH
-                                    else:
-                                        flag |= CollisionTest.SOLID
-                                coll[idx] = (coll[idx][0] | flag, coll[idx][1], coll[idx][2], coll[idx][3])
-                                if flag & CollisionTest.SOLID:
-                                    cnt = coll[idx][1] + 1
-                                    min_yo = yo + cyo if coll[idx][2] == -1 or coll[idx][2] > yo + cyo else coll[idx][2]
-                                    max_yo = yo + cyo if coll[idx][3] == -1 or coll[idx][3] < yo + cyo else coll[idx][3]
-                                    coll[idx] = (coll[idx][0], cnt, min_yo, max_yo)
+        pixels = self.access_collision()
+        for yo in range(h):
+            cy = y + yo
+            for xo in range(w):
+                cx = x + xo
+                sat = 0
+                for cxo, cyo, idx in [(1, 0, 0), (0, -1, 1), (-1, 0, 2), (0, 1, 3), (0, 0, 4)]:
+                    try:
+                        if cx + cxo < 0 or cy + cyo < 0:
+                            raise IndexError
+                        pxb = pixels[cx + cxo][cy + cyo]
+                        px = (pxb[0] << 16) + (pxb[1] << 8) + pxb[2]
+                        if px in Screen.collision_test_flags or (extra_flags is not None and px in extra_flags):
+                            flag = Screen.collision_test_flags[px]
+                            coll[idx] = (coll[idx][0] | Screen.collision_test_flags[px], coll[idx][1], coll[idx][2], coll[idx][3])
+                            if flag & COLLISIONTEST_PREVENTS_MOVEMENT:
+                                cnt = coll[idx][1] + 1
+                                min_yo = yo + cyo if coll[idx][2] == -1 or coll[idx][2] > yo + cyo else coll[idx][2]
+                                max_yo = yo + cyo if coll[idx][3] == -1 or coll[idx][3] < yo + cyo else coll[idx][3]
+                                coll[idx] = (coll[idx][0], cnt, min_yo, max_yo)
+                    except IndexError:
+                        flag = 0
+                        if cx + cxo < 0:
+                            if self.transitions[2]:
+                                flag |= CollisionTest.TRANSITION_WEST
+                            else:
+                                flag |= CollisionTest.SOLID
+                        elif cy + cyo < 0:
+                            if self.transitions[1]:
+                                flag |= CollisionTest.TRANSITION_NORTH
+                            else:
+                                flag |= CollisionTest.SOLID
+                        elif cx + cxo >= SCREEN_SIZE_W:
+                            if self.transitions[0]:
+                                flag |= CollisionTest.TRANSITION_EAST
+                            else:
+                                flag |= CollisionTest.SOLID
+                        elif cy + cyo >= SCREEN_SIZE_H:
+                            if self.transitions[3]:
+                                flag |= CollisionTest.TRANSITION_SOUTH
+                            else:
+                                flag |= CollisionTest.SOLID
+                        coll[idx] = (coll[idx][0] | flag, coll[idx][1], coll[idx][2], coll[idx][3])
+                        if flag & CollisionTest.SOLID:
+                            cnt = coll[idx][1] + 1
+                            min_yo = yo + cyo if coll[idx][2] == -1 or coll[idx][2] > yo + cyo else coll[idx][2]
+                            max_yo = yo + cyo if coll[idx][3] == -1 or coll[idx][3] < yo + cyo else coll[idx][3]
+                            coll[idx] = (coll[idx][0], cnt, min_yo, max_yo)
 
-                            if coll[idx] == cap:
-                                sat += 1
-                        if sat == len(coll):
-                            break
+                    if coll[idx] == cap:
+                        sat += 1
                 if sat == len(coll):
                     break
+            if sat == len(coll):
+                break
         return coll
 
     def test_interactable_collision(self, ctrl, x, y, hitbox, interactable_type=CollisionTest.INTERACTABLE):
         x = int(x)
         y = int(y)
-        bbw = len(hitbox)
-        bbh = len(hitbox[0])
+        bbw = hitbox[0]
+        bbh = hitbox[1]
         lx = x + bbw - 1
         ly = y + bbh - 1
         for obj in self.objects:
             if obj.hitbox_type & interactable_type:
-                obw = len(obj.hitbox)
-                obh = len(obj.hitbox[0])
+                obw = obj.hitbox_w
+                obh = obj.hitbox_h
                 olx = int(obj.x) + obw
                 oly = int(obj.y) + obh
                 if len(range(max(x, int(obj.x)), min(lx, olx))) and len(range(max(y, int(obj.y)), min(ly, oly))):
                     obj.interact(ctrl)
 
-    def render_collisions_to_window(self, wnd):
-        win_w = wnd.display.get_width()
-        win_h = wnd.display.get_height()
-        resizing = False
-        if self.pre_rendered_collisions is not None:
-            pr_w = self.pre_rendered_collisions.get_width()
-            pr_h = self.pre_rendered_collisions.get_height()
-            if pr_w != win_w or pr_h != win_h:
-                resizing = True
-        else:
-            pr_w = win_w
-            pr_h = win_h
-        resizing = self.ensure_unscaled_collisions() or resizing
-        if resizing or self.pre_rendered_collisions is None:
-            self.pre_rendered_collisions = pygame.Surface((win_w, win_h))
-            pygame.transform.smoothscale(self.pre_rendered_unscaled_collisions, (win_w, win_h), self.pre_rendered_collisions)
-            self.pre_rendered_collisions.set_alpha(128)
-        wnd.display.blit(self.pre_rendered_collisions, (0, 0))
+    def render_collisions_to_window(self, wnd, fbo):
+        self.ensure_unscaled_collisions()
+        self.terrain_collisions.screen_render(wnd, 0, 0, wnd.w, wnd.h, fbo, colorize=(1.0, 1.0, 1.0, 0.5))
+
+    def render_all_collisions_to_window(self, wnd, fbo):
+        self.generate_object_collisions()
+        fbo.bind()
+        self.all_collisions.screen_render(wnd, 0, 0, wnd.w, wnd.h, fbo, colorize=(1.0, 1.0, 1.0, 0.5))
 
     def tick(self, ctrl):
         for obj in self.objects.copy():

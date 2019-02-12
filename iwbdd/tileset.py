@@ -1,6 +1,5 @@
 from .common import eofc_read
 import struct
-import pygame
 from io import BytesIO
 import numpy as np
 from PIL import Image
@@ -44,6 +43,7 @@ class Tileset:
     draw_surface_h = 0
     TILE_W = 24
     TILE_H = 24
+    collision_tileset = 3
     identity = Mat4()
 
     @staticmethod
@@ -74,6 +74,8 @@ class Tileset:
         glBindVertexArray(0)
         if reader is not None:
             self.read_tileset_data(reader)
+        if self.tileset_id == Tileset.collision_tileset:
+            Tileset.collision_tileset = self
 
     def read_tileset_data(self, reader):
         self.tileset_id = struct.unpack('<L', eofc_read(reader, 4))[0]
@@ -119,6 +121,20 @@ class Tileset:
             prog.uniform('tile_w', float(Tileset.TILE_W))
             prog.uniform('tile_h', float(Tileset.TILE_H))
             prog.uniform('colorize', self.vec_buf)
+            self.tex.bindtexunit(0)
+            transparency_tex.bindtexunit(1)
+            tileids_tex.bindtexunit(2)
+            glBindVertexArray(self.vao)
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
+            logger.log_draw()
+            glBindVertexArray(0)
+
+    def draw_as_collision(self, x, y, draw_w, draw_h, transparency_tex, tileids_tex):
+        with GSHp('GSHP_render_terrain_no_blend') as prog:
+            Window.instance.setup_render(prog)
+            prog.uniform('model', Mat4.scaling(draw_w, draw_h, 1))
+            prog.uniform('tile_w', float(Tileset.TILE_W))
+            prog.uniform('tile_h', float(Tileset.TILE_H))
             self.tex.bindtexunit(0)
             transparency_tex.bindtexunit(1)
             tileids_tex.bindtexunit(2)
