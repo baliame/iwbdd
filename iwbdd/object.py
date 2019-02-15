@@ -160,7 +160,7 @@ class Object:
             if self.hitbox_model is None:
                 ix = int(self.x)
                 iy = int(self.y)
-                self.hitbox_model = Mat4.scaling(self.hitbox_w, self.hitbox_h).translate(ix + self._offset_x, wnd.h - (iy + self._offset_y))
+                self.hitbox_model = Mat4.scaling(self.hitbox_w, self.hitbox_h).translate(ix, wnd.h - iy)
                 glBindVertexArray(self.hitbox_vao)
                 glEnableVertexAttribArray(0)
                 temp = VBO(np.array([0, 0, 1, 0, 0, 1, 1, 1], dtype='f'))

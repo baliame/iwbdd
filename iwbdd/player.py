@@ -2,7 +2,7 @@ from .object import Object, Bullet
 from .spritesheet import Spritesheet
 from .pygame_oo.main_loop import MainLoop
 from .audio_data import Audio
-from .common import eofc_read
+from .common import eofc_read, CollisionTest
 import struct
 # import pygame
 # import numpy as np
@@ -53,8 +53,9 @@ class Player(Object):
         self._state = "stop_right"
         self.hitbox_w = 16
         self.hitbox_h = 8
+        self.hitbox_type = CollisionTest.PASSABLE
         self.offset_x = -4
-        self.offset_y = -16
+        self.offset_y = -12
         self.bullets = []
         self.controller = ctrl
         self.save_state = None
@@ -140,7 +141,7 @@ class Player(Object):
         self.hitbox_w = 16
         self.hitbox_h = 8
         self.offset_x = -4
-        self.offset_y = -16
+        self.offset_y = 0
 
     def die(self):
         self.spritesheet.variant_color = 0xFF0000

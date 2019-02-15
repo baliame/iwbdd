@@ -591,14 +591,16 @@ class Controller:
             wnd.use_game_viewport()
             if self.current_screen is not None:
                 self.current_screen.render_to_window(wnd)
+                self.render_collisions = True
+                self.also_render_objects = True
                 if not self.render_collisions:
                     self.current_screen.render_objects(wnd)
                     self.player.draw(wnd)
                 else:
-                    self.current_screen.render_collisions_to_window(wnd)
                     if self.also_render_objects:
                         self.current_screen.render_objects(wnd)
-                    self.current_screen.render_objects_hitboxes(wnd)
+                    self.current_screen.render_all_collisions_to_window(wnd, wnd.fbo)
+                    self.player.draw(wnd)
                     self.player.draw_as_hitbox(wnd, (0, 255, 0))
                 if self.bossfight and self.bossfight.state >= 2:
                     wnd.graphics.box("boss_health_background", 982 - self.bossfight.boss.initial_health, 23, self.bossfight.boss.initial_health + 2, 26, (0, 0, 0, 255), (0, 0, 0, 255))

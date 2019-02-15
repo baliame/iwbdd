@@ -47,8 +47,8 @@ void main() {
 
     spr.a *= colorize.a;
 
-    vec3 clr = spr.a * spr.rgb + (1 - spr.a) * scr.rgb;
-    out_color = vec4(clr.rgb * colorize.rgb, 1);
+    vec3 clr = spr.a * spr.rgb * colorize.rgb + (1 - spr.a) * scr.rgb;
+    out_color = vec4(clr.rgb, 1);
 }
 
 """.strip()
@@ -73,8 +73,8 @@ void main() {
 
     spr.a *= colorize.a;
 
-    vec3 clr = spr.a * spr.rgb + (1 - spr.a) * scr.rgb;
-    out_color = vec4(clr.rgb * colorize.rgb, 1);
+    vec3 clr = spr.a * spr.rgb * colorize.rgb + (1 - spr.a) * scr.rgb;
+    out_color = vec4(clr.rgb, 1);
 }
 
 """.strip()
@@ -108,8 +108,8 @@ void main() {
 
     spr.a *= colorize.a;
 
-    vec3 clr = spr.a * spr.rgb + (1 - spr.a) * scr.rgb;
-    out_color = vec4(clr.rgb * colorize.rgb, 1);
+    vec3 clr = spr.a * spr.rgb * colorize.rgb + (1 - spr.a) * scr.rgb;
+    out_color = vec4(clr.rgb, 1);
 }
 
 """.strip()

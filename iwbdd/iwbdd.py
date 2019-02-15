@@ -94,7 +94,7 @@ def profiled():
     pr = profile.Profile()
     pr.enable()
     pr.runcall(main)
-    # pr.dump_stats('prof.out')
+    #pr.dump_stats('prof.out')
     pr.print_stats('cumulative')
 
 

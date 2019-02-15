@@ -41,7 +41,7 @@ class ActivatableLens(LensParent):
             if self.active:
                 self.active = 0
                 scr.objects_dirty = True
-                if scr == ctrl.player.screen:
+                if scr == ctrl.player.screen and not ctrl.player.dead:
                     coll = scr.test_screen_collision(ctrl.player.x, ctrl.player.y, (ctrl.player.hitbox_w, ctrl.player.hitbox_h))
                     if coll[4][0] & COLLISIONTEST_PREVENTS_MOVEMENT:
                         ctrl.player.die()
@@ -51,6 +51,7 @@ class ActivatableLens(LensParent):
                 scr.objects_dirty = True
 
     def draw(self, wnd):
+        return
         ix = int(self.x)
         iy = int(self.y)
         if not self.hidden:
@@ -75,6 +76,7 @@ class ActivatableLens(LensParent):
                 glBindVertexArray(0)
 
     def draw_as_hitbox(self, wnd, color):
+        return
         if self.hidden or not self.active:
             return
         ix = int(self.x)
@@ -155,12 +157,13 @@ class MovingLens(LensParent):
         self.x = nx
         self.y = ny
         scr.objects_dirty = True
-        if scr == ctrl.player.screen:
+        if scr == ctrl.player.screen and not ctrl.player.dead:
             coll = scr.test_screen_collision(ctrl.player.x, ctrl.player.y, (ctrl.player.hitbox_w, ctrl.player.hitbox_h))
             if coll[4][0] & COLLISIONTEST_PREVENTS_MOVEMENT:
                 ctrl.player.die()
 
     def draw(self, wnd):
+        return
         ix = int(self.x)
         iy = int(self.y)
         if not self.hidden:
@@ -179,6 +182,7 @@ class MovingLens(LensParent):
                 glBindVertexArray(0)
 
     def draw_as_hitbox(self, wnd, color):
+        return
         if self.hidden:
             return
         ix = int(self.x)

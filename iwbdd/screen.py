@@ -10,6 +10,7 @@ from .pygame_oo.framebuf import Framebuffer
 import copy
 from OpenGL.GL import *
 import numpy as np
+from PIL import Image
 
 
 class Collision(IntEnum):
@@ -112,7 +113,8 @@ class Screen:
         self.collids = Texture2D(Screen.SCREEN_W, Screen.SCREEN_H, np.zeros((Screen.SCREEN_H, Screen.SCREEN_W), dtype=np.uint32), arr_type=GL_UNSIGNED_INT, arr_colors=GL_RED_INTEGER, dest_colors=GL_R32UI, magf=GL_NEAREST, minf=GL_NEAREST)
         self.terrain_collisions = Texture2D(dim[0], dim[1], np.zeros(dim[0] * dim[1] * 4, dtype='f'), arr_type=GL_FLOAT, arr_colors=GL_RGBA, dest_colors=GL_RGBA, magf=GL_NEAREST, minf=GL_NEAREST)
         self.all_collisions = Texture2D(dim[0], dim[1], np.zeros(dim[0] * dim[1] * 4, dtype='f'), arr_type=GL_FLOAT, arr_colors=GL_RGBA, dest_colors=GL_RGBA, magf=GL_NEAREST, minf=GL_NEAREST)
-        self.terrain_collision_data = []
+        self.terrain_collision_data = b''
+        self.all_collision_data = b''
 
     def reset_to_initial_state(self):
         self.objects = []
@@ -344,7 +346,7 @@ class Screen:
     def render_objects_hitboxes(self, wnd):
         for obj in self.objects:
             if obj.hitbox_type in COLLISIONTEST_COLORS:
-                obj.draw_as_hitbox(wnd, fbo, COLLISIONTEST_COLORS[obj.hitbox_type])
+                obj.draw_as_hitbox(wnd, COLLISIONTEST_COLORS[obj.hitbox_type])
 
     def ensure_unscaled_collisions(self):
         if self.dirty_collisions:
@@ -359,7 +361,7 @@ class Screen:
                 fbo.new_render_pass(True)
                 Tileset.collision_tileset.draw_as_collision(0, 0, fbo.w, fbo.h, fbo, self.collids)
             self.terrain_collisions.bindtexunit(0)
-            self.terrain_collision_data = glGetTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_UNSIGNED_BYTE, outputType=list)
+            self.terrain_collision_data = glGetTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_UNSIGNED_BYTE)
             self.dirty_collisions = False
             return True
         return False
@@ -374,7 +376,7 @@ class Screen:
                     if obj.hitbox_type in COLLISIONTEST_COLORS:
                         obj.draw_as_hitbox(Window.instance, COLLISIONTEST_COLORS[obj.hitbox_type])
             self.all_collisions.bindtexunit(0)
-            self.all_collision_data = glGetTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_UNSIGNED_BYTE, outputType=list)
+            self.all_collision_data = glGetTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_UNSIGNED_BYTE)
             self.objects_dirty = False
 
     def access_collision(self):
@@ -400,8 +402,8 @@ class Screen:
                     try:
                         if cx + cxo < 0 or cy + cyo < 0:
                             raise IndexError
-                        pxb = pixels[cx + cxo][cy + cyo]
-                        px = (pxb[0] << 16) + (pxb[1] << 8) + pxb[2]
+                        base_idx = ((Window.instance.h - (cy + cyo)) * Window.instance.w + cx + cxo) * 3
+                        px = (pixels[base_idx] << 16) + (pixels[base_idx + 1] << 8) + pixels[base_idx + 2]
                         if px in Screen.collision_test_flags or (extra_flags is not None and px in extra_flags):
                             flag = Screen.collision_test_flags[px]
                             coll[idx] = (coll[idx][0] | Screen.collision_test_flags[px], coll[idx][1], coll[idx][2], coll[idx][3])
@@ -464,12 +466,17 @@ class Screen:
                     obj.interact(ctrl)
 
     def render_collisions_to_window(self, wnd, fbo):
+        binding = Framebuffer.bound
         self.ensure_unscaled_collisions()
+        if binding is not None:
+            binding.bind()
         self.terrain_collisions.screen_render(wnd, 0, 0, wnd.w, wnd.h, fbo, colorize=(1.0, 1.0, 1.0, 0.5))
 
     def render_all_collisions_to_window(self, wnd, fbo):
+        binding = Framebuffer.bound
         self.generate_object_collisions()
-        fbo.bind()
+        if binding is not None:
+            binding.bind()
         self.all_collisions.screen_render(wnd, 0, 0, wnd.w, wnd.h, fbo, colorize=(1.0, 1.0, 1.0, 0.5))
 
     def tick(self, ctrl):

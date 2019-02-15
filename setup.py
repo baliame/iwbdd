@@ -25,6 +25,7 @@ setup(
     entry_points={
         'console_scripts': [
             'iwbdd=iwbdd.iwbdd:main',
+            'iwbdd_prof=iwbdd.iwbdd:profiled',
             'iwbdd_tsp=iwbdd.iwbdd:pack_tilesets',
             'iwbdd_bgp=iwbdd.iwbdd:pack_backgrounds',
             'iwbdd_ssp=iwbdd.iwbdd:pack_spritesheets',
@@ -33,7 +34,6 @@ setup(
         ],
         'gui_scripts': [
             'iwbdd_boss=iwbdd.iwbdd:boss_tester',
-            'iwbdd_prof=iwbdd.iwbdd:profiled',
             'iwbdd_bossprof=iwbdd.iwbdd:profiled_boss',
             'iwbdd_editor=iwbdd.iwbdd:editor',
             'iwbdd_editor_w2=iwbdd.iwbdd:editor_w2',

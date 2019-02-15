@@ -25,6 +25,7 @@ class Framebuffer:
         self.view = Mat4.scaling(2, 2, 1).translate(-1, -1)
         self.identity = Mat4()
         self.vao = glGenVertexArrays(1)
+        self.external = False
         glBindVertexArray(self.vao)
         self.draw_arrays.bind()
         glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, self.draw_arrays)
@@ -40,6 +41,7 @@ class Framebuffer:
     def use_external_texture(self, tex):
         self.target = tex
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, self.target.texid, 0)
+        self.external = True
 
     def bindmaintexunit(self, unit):
         glActiveTexture(TexUnitEnum(unit))
@@ -59,7 +61,7 @@ class Framebuffer:
 
     def new_render_pass(self, clear=False):
         if clear:
-            self.transparency.clear()
+            glClearBufferiv(GL_COLOR, 0, np.array([0, 0, 0, 0], dtype='f'))
         else:
             self.read_copy()
             logger.log_read_copy(self.fbo_name)
