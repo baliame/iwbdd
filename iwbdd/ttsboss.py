@@ -1,4 +1,3 @@
-from .object import generate_rectangle_hitbox, generate_circle_hitbox
 from .bossfight import Phase, CycleElement, RandomCycleElement, Boss, BossfightObject
 from .spritesheet import Spritesheet
 from .audio_data import Audio
@@ -19,8 +18,8 @@ class TTSBoss_At(BossfightObject):
         }
         self.state = "default"
         self.activation_delay = self.cycle_delay
-        if TTSBoss_At.default_hitbox is None:
-            TTSBoss_At.default_hitbox = generate_circle_hitbox(22)
+        # if TTSBoss_At.default_hitbox is None:
+            # TTSBoss_At.default_hitbox = generate_circle_hitbox(22)
         self.hitbox = TTSBoss_At.default_hitbox
         self.hitbox_type = CollisionTest.DEADLY
         self.offset_x = -2
@@ -55,7 +54,7 @@ class TTSBoss_Bit(BossfightObject):
         }
         self.state = "default"
         self.activation_delay = self.cycle_delay
-        self.hitbox = generate_rectangle_hitbox(20, 20)
+        #self.hitbox = generate_rectangle_hitbox(20, 20)
         self.hitbox_type = CollisionTest.DEADLY
         self.offset_x = -2
         self.velocity = (0, 0)
@@ -430,7 +429,7 @@ class TTSBoss(Boss):
         self.health = 120
         self.t = 0
         self.spritesheet.variant_alpha = 0
-        self.hitbox = generate_rectangle_hitbox(120, 120)
+        #self.hitbox = generate_rectangle_hitbox(120, 120)
         self.hitbox_type = CollisionTest.PASSABLE
         self.wait_for_phase_transition = False
         self.color_frames = 10

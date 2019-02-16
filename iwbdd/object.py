@@ -11,23 +11,7 @@ import struct
 from .spritesheet import Spritesheet
 
 
-def generate_rectangle_hitbox(w, h):
-    return np.ones((w, h))
-    # return np.array([[1 for y in range(h)] for x in range(w)])
-
-
-def generate_circle_hitbox(rad):
-    wh = 2 * rad + 1
-    hb = np.zeros((wh, wh))
-    xx, yy = np.mgrid[:wh, :wh]
-    dist2 = (xx - rad) ** 2 + (yy - rad) ** 2 <= rad ** 2
-    hb[dist2] = 1
-    return hb
-
-
-def generate_semicircle_hitbox(rad):
-    return generate_circle_hitbox(rad)[:, :rad + 1]
-
+DRAW_PASSES = 2
 
 class EPType(Enum):
     IntSelector = 1    # Arguments: default, min, max, step
@@ -82,7 +66,9 @@ class Object:
         self.hitbox_w = 0
         self.hitbox_h = 0
         self.hitbox_model = None
+        self.hitbox_model_attr = (0, 0, 0, 0)
         self.hitbox_vao = glGenVertexArrays(1)
+        self.draw_pass = 0
 
         self.hbds_dirty = True
 
@@ -123,7 +109,7 @@ class Object:
 
     def draw(self, wnd):
         ix = int(self.x)
-        iy = int(self.y)
+        iy = int(self.y + self.hitbox_h)
         if not self.hidden and self.spritesheet is not None and self._state in self.states:
             draw_x = ix + self._offset_x
             draw_y = iy + self._offset_y
@@ -157,10 +143,10 @@ class Object:
         if self.hidden:
             return
         if not self.managed_hbds and self.hitbox_w > 0 and self.hitbox_h > 0:
-            if self.hitbox_model is None:
-                ix = int(self.x)
-                iy = int(self.y)
-                self.hitbox_model = Mat4.scaling(self.hitbox_w, self.hitbox_h).translate(ix, wnd.h - iy)
+            ix = int(self.x)
+            iy = int(self.y)
+            if self.hitbox_model is None or self.hitbox_model_attr != (ix, iy, self.hitbox_w, self.hitbox_h):
+                self.hitbox_model = Mat4.scaling(self.hitbox_w, self.hitbox_h).translate(ix, wnd.h - self.hitbox_h - iy)
                 glBindVertexArray(self.hitbox_vao)
                 glEnableVertexAttribArray(0)
                 temp = VBO(np.array([0, 0, 1, 0, 0, 1, 1, 1], dtype='f'))
@@ -168,6 +154,7 @@ class Object:
                 glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, temp)
                 temp.unbind()
                 glBindVertexArray(0)
+                self.hitbox_model_attr = (ix, iy, self.hitbox_w, self.hitbox_h)
             with GSHp("GSHP_colorfill") as prog:
                 wnd.setup_render(prog)
                 prog.uniform('model', self.hitbox_model)

@@ -4,6 +4,7 @@ from .background import Background
 from .tileset import Tileset
 from .common import eofc_read, is_reader_stream, CollisionTest, COLLISIONTEST_PREVENTS_MOVEMENT, SCREEN_SIZE_W, SCREEN_SIZE_H, COLLISIONTEST_COLORS
 from .object_importer import read_object
+from .object import DRAW_PASSES
 from .pygame_oo.window import Window
 from .pygame_oo.texture import Texture2D
 from .pygame_oo.framebuf import Framebuffer
@@ -336,8 +337,10 @@ class Screen:
             self.world.tileset.draw_full_screen(0, 0, wnd.w, wnd.h, wnd.fbo, self.tileids[int(l2)])
 
     def render_objects(self, wnd):
-        for obj in self.objects:
-            obj.draw(wnd)
+        for i in range(DRAW_PASSES):
+            for obj in self.objects:
+                if obj.draw_pass == i:
+                    obj.draw(wnd)
 
     def render_editor_objects(self, wnd):
         for obj in self.bound_objects:
@@ -400,12 +403,14 @@ class Screen:
                 sat = 0
                 for cxo, cyo, idx in [(1, 0, 0), (0, -1, 1), (-1, 0, 2), (0, 1, 3), (0, 0, 4)]:
                     try:
-                        if cx + cxo < 0 or cy + cyo < 0:
+                        if cx + cxo < 0 or cy + cyo < 0 or cx + cxo >= SCREEN_SIZE_W or cy + cyo >= SCREEN_SIZE_H:
                             raise IndexError
                         base_idx = ((Window.instance.h - (cy + cyo)) * Window.instance.w + cx + cxo) * 3
                         px = (pixels[base_idx] << 16) + (pixels[base_idx + 1] << 8) + pixels[base_idx + 2]
                         if px in Screen.collision_test_flags or (extra_flags is not None and px in extra_flags):
                             flag = Screen.collision_test_flags[px]
+                            if idx == 4 and flag & CollisionTest.DEADLY:
+                                print(cx + cxo, cy + cyo, "{0:02X}".format(px), flag)
                             coll[idx] = (coll[idx][0] | Screen.collision_test_flags[px], coll[idx][1], coll[idx][2], coll[idx][3])
                             if flag & COLLISIONTEST_PREVENTS_MOVEMENT:
                                 cnt = coll[idx][1] + 1

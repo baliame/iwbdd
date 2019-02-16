@@ -55,7 +55,7 @@ class Player(Object):
         self.hitbox_h = 8
         self.hitbox_type = CollisionTest.PASSABLE
         self.offset_x = -4
-        self.offset_y = -12
+        self.offset_y = 0
         self.bullets = []
         self.controller = ctrl
         self.save_state = None

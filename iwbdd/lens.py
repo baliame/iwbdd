@@ -1,10 +1,13 @@
-from .object import Object, EPType, generate_circle_hitbox, generate_semicircle_hitbox
-from .common import CollisionTest, SCREEN_SIZE_W, SCREEN_SIZE_H, COLLISIONTEST_PREVENTS_MOVEMENT
+from .object import Object, EPType
+from .common import CollisionTest, COLLISIONTEST_PREVENTS_MOVEMENT
 import numpy as np
 from .pygame_oo.game_shaders import GSHp, GSH_vaos
+from .pygame_oo.framebuf import Framebuffer
 from .pygame_oo.shader import Mat4
 from .pygame_oo.window import Window
 from OpenGL.GL import *
+
+from OpenGL.arrays.vbo import VBO
 
 
 class LensParent(Object):
@@ -14,6 +17,7 @@ class LensParent(Object):
     def __init__(self, screen, x=0, y=0, init_dict=None):
         super().__init__(screen, x, y, init_dict)
         self.hitbox_type = CollisionTest.LENS
+        self.draw_pass = 1
 
 
 class ActivatableLens(LensParent):
@@ -51,14 +55,14 @@ class ActivatableLens(LensParent):
                 scr.objects_dirty = True
 
     def draw(self, wnd):
-        return
         ix = int(self.x)
-        iy = int(self.y)
+        iy = int(self.y + self.radius * 2)
         if not self.hidden:
             draw_x = ix + self._offset_x
             draw_y = iy + self._offset_y
             if draw_x != self.draw_x_m or draw_y != self.draw_y_m:
                 self.model = Mat4.scaling(self.radius * 2, self.radius * 2).translate(draw_x, wnd.h - draw_y)
+                #self.model = Mat4.translation(draw_x, wnd.h - draw_y).scale(self.radius * 2, self.radius * 2)
                 self.draw_x_m = draw_x
                 self.draw_y_m = draw_y
             prog_name = "GSHP_lens_off"
@@ -76,11 +80,10 @@ class ActivatableLens(LensParent):
                 glBindVertexArray(0)
 
     def draw_as_hitbox(self, wnd, color):
-        return
         if self.hidden or not self.active:
             return
         ix = int(self.x)
-        iy = int(self.y)
+        iy = int(self.y + self.radius * 2)
         draw_x = ix + self._offset_x
         draw_y = iy + self._offset_y
         if draw_x != self.draw_x_m or draw_y != self.draw_y_m:
@@ -91,7 +94,7 @@ class ActivatableLens(LensParent):
             wnd.setup_render(prog)
             prog.uniform('model', self.model)
 
-            wnd.fbo.bindtexunit(1)
+            Framebuffer.bound.bindtexunit(1)
             self.screen.background.tex.bindtexunit(2)
 
             glBindVertexArray(GSH_vaos['unit'])
@@ -163,7 +166,6 @@ class MovingLens(LensParent):
                 ctrl.player.die()
 
     def draw(self, wnd):
-        return
         ix = int(self.x)
         iy = int(self.y)
         if not self.hidden:
@@ -182,7 +184,6 @@ class MovingLens(LensParent):
                 glBindVertexArray(0)
 
     def draw_as_hitbox(self, wnd, color):
-        return
         if self.hidden:
             return
         ix = int(self.x)
@@ -193,7 +194,7 @@ class MovingLens(LensParent):
         with GSHp("GSHP_lens_semi_coll") as prog:
             wnd.setup_render(prog)
             prog.uniform('model', self.model)
-            wnd.fbo.bindtexunit(1)
+            Framebuffer.bound.bindtexunit(1)
             self.screen.background.tex.bindtexunit(2)
             glBindVertexArray(GSH_vaos['unit'])
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)

@@ -19,13 +19,13 @@ class Texture2D:
     uv_arrays = None
     vao = None
 
-    def __init__(self, w, h, arr=None, arr_type=GL_UNSIGNED_BYTE, arr_colors=GL_RGBA, magf=GL_LINEAR, minf=GL_LINEAR, dest_colors=None, no_init=False):
+    def __init__(self, w, h, arr=None, arr_type=GL_UNSIGNED_BYTE, arr_colors=GL_RGBA, magf=GL_LINEAR, minf=GL_LINEAR, dest_colors=None, no_init=False, wrap_x=GL_CLAMP_TO_EDGE, wrap_y=GL_CLAMP_TO_EDGE):
         if dest_colors is None:
             dest_colors = arr_colors
         self.texid = glGenTextures(1)
         glBindTexture(GL_TEXTURE_2D, self.texid)
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap_x)
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_y)
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magf)
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minf)
         if no_init:

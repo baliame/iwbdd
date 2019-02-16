@@ -591,11 +591,12 @@ class Controller:
             wnd.use_game_viewport()
             if self.current_screen is not None:
                 self.current_screen.render_to_window(wnd)
-                self.render_collisions = True
-                self.also_render_objects = True
+                #self.render_collisions = True
+                #self.also_render_objects = True
                 if not self.render_collisions:
                     self.current_screen.render_objects(wnd)
                     self.player.draw(wnd)
+                    pass
                 else:
                     if self.also_render_objects:
                         self.current_screen.render_objects(wnd)
@@ -608,6 +609,8 @@ class Controller:
                         wnd.graphics.box("boss_health_bar", 983 - self.bossfight.boss.initial_health, 24, self.bossfight.boss.health, 24, (255, 255, 255, 255), (255, 255, 255, 255))
 
     def keydown_handler(self, event, ml):
+        if event.key == glfw.KEY_Z:
+            print(self.current_screen.test_screen_collision(int(self.player.x), int(self.player.y), (self.player.hitbox_w, self.player.hitbox_h)))
         if event.key in self.keybindings_lookup:
             ctrl = self.keybindings_lookup[event.key]
             if ctrl == Controls.RESET:

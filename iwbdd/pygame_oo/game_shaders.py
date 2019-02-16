@@ -218,7 +218,9 @@ void main() {
     vec2 dist_uv = vec2(in_screen_uv.x + (in_uv.x - 0.5) * (in_uv.x - 0.5) * 0.2, in_screen_uv.y + (in_uv.y - 0.5) * (in_uv.y - 0.5) * 0.2);
     vec4 scr = texture(screen, in_screen_uv);
     vec4 bg = texture(background, dist_uv);
-    float r2 = in_uv.x * in_uv.x + in_uv.y * in_uv.y;
+    float ux = in_uv.x * 2 - 1;
+    float uy = in_uv.y * 2 - 1;
+    float r2 = ux * ux + uy * uy;
     if (r2 > 1.05) {
         out_color = scr;
     }
@@ -226,7 +228,7 @@ void main() {
         out_color = vec4(0, 0, 0, 1);
     }
     else {
-        out_color = bg;
+        out_color = bg * 0.75 + scr * 0.25;
     }
 }
 
@@ -245,7 +247,9 @@ layout(location = 0) out vec4 out_color;
 
 void main() {
     vec4 scr = texture(screen, in_screen_uv);
-    float r2 = in_uv.x * in_uv.x + in_uv.y * in_uv.y;
+    float ux = in_uv.x * 2 - 1;
+    float uy = in_uv.y * 2 - 1;
+    float r2 = ux * ux + uy * uy;
     if (r2 > 1.05) {
         out_color = scr;
     }
@@ -272,12 +276,14 @@ layout(location = 0) out vec4 out_color;
 
 void main() {
     vec4 scr = texture(screen, in_screen_uv);
-    float r2 = in_uv.x * in_uv.x + in_uv.y * in_uv.y;
+    float ux = in_uv.x * 2 - 1;
+    float uy = in_uv.y * 2 - 1;
+    float r2 = ux * ux + uy * uy;
     if (r2 > 1.0) {
         out_color = scr;
     }
     else {
-        out_color = vec4(128, 0, 0, 255);
+        out_color = vec4(0.5, 0, 0, 1.0);
     }
 }
 
@@ -303,7 +309,9 @@ void main() {
     } else {
         vec2 dist_uv = vec2(in_screen_uv.x + (in_uv.x - 0.5) * (in_uv.x - 0.5) * 0.2, in_screen_uv.y + (in_uv.y - 0.5) * (in_uv.y - 0.5) * 0.2);
         vec4 bg = texture(background, dist_uv);
-        float r2 = in_uv.x * in_uv.x + in_uv.y * in_uv.y;
+        float ux = in_uv.x * 2 - 1;
+        float uy = in_uv.y * 2 - 1;
+        float r2 = ux * ux + uy * uy;
         if (r2 > 1.05) {
             out_color = scr;
         }
@@ -311,7 +319,7 @@ void main() {
             out_color = vec4(0, 0, 0, 1);
         }
         else {
-            out_color = bg;
+            out_color = bg * 0.75 + scr * 0.25;
         }
     }
 }
@@ -334,12 +342,14 @@ void main() {
     if (in_uv.y < 0.5) {
         out_color = scr;
     } else {
-        float r2 = in_uv.x * in_uv.x + in_uv.y * in_uv.y;
+        float ux = in_uv.x * 2 - 1;
+        float uy = in_uv.y * 2 - 1;
+        float r2 = ux * ux + uy * uy;
         if (r2 > 1.0) {
             out_color = scr;
         }
         else {
-            out_color = vec4(128, 0, 0, 255);
+            out_color = vec4(0.5, 0, 0, 1.0);
         }
     }
 }
@@ -403,6 +413,8 @@ def GSH_init():
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, vbo)
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, vbo)
     vbo.unbind()
+    glEnableVertexAttribArray(0)
+    glEnableVertexAttribArray(1)
     glBindVertexArray(0)
     GSH_wasinit = True
 

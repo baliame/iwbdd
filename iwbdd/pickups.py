@@ -1,4 +1,4 @@
-from .object import Object, generate_rectangle_hitbox
+from .object import Object
 from .spritesheet import Spritesheet
 from .common import CollisionTest
 
@@ -10,7 +10,8 @@ class DoublejumpPellet(Object):
     def __init__(self, screen, x=0, y=0, init_dict=None):
         super().__init__(screen, x, y, init_dict)
         self.spritesheet = Spritesheet.spritesheets_byname["ss_object_small_pickups-8-8.png"]
-        self.hitbox = generate_rectangle_hitbox(6, 8)
+        self.hitbox_w = 6
+        self.hitbox_h = 8
         self.hitbox_type = CollisionTest.INTERACTABLE
         self.states = {
             "available": (True, 0.05, [(0, 0), (1, 0), (2, 0), (3, 0)], True),

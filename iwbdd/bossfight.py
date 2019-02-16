@@ -1,5 +1,5 @@
 from .common import CollisionTest
-from .object import Object, ExplosionEffect, generate_rectangle_hitbox
+from .object import Object, ExplosionEffect
 from .spritesheet import Spritesheet
 from .pygame_oo.window import Window
 import copy

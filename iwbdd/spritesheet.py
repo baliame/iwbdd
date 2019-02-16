@@ -118,7 +118,7 @@ class Spritesheet:
 
     def draw_cell_to(self, x, y, draw_x, draw_y, transparency):
         with GSHp('GSHP_render_sheet') as prog:
-            render_loc = self.model * Mat4.translation(draw_x, Window.instance.h - draw_y - self.cell_h)
+            render_loc = self.model * Mat4.translation(draw_x, Window.instance.h - draw_y)
             # render_loc = Mat4.translation(draw_x, draw_y) * self.model
             # render_loc = self.model
             self.vec_buf.load_rgb_a(self.variant_color, self.variant_alpha)
