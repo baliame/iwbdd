@@ -433,8 +433,8 @@ class Button(Object):
             "active": (False, (2, 0)),
         }
         self.state = "default"
-        self._offset_x = -4
-        self._offset_y = -4
+        self._offset_x = 4
+        self._offset_y = 4
 
     def tick(self, scr, ctrl):
         if ctrl.trigger_group[self.trigger_group] and self._state == "default":

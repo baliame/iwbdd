@@ -15,7 +15,6 @@ class Player(Object):
 
     def __init__(self, ctrl):
         super().__init__(None)
-        self.bottom_pixel = 0
         # self.hitbox = generate_rectangle_hitbox(12, self.bottom_pixel + 1)
         # self.offset_x = -6
         # self.offset_y = -9
@@ -53,6 +52,7 @@ class Player(Object):
         self._state = "stop_right"
         self.hitbox_w = 16
         self.hitbox_h = 8
+        self.bottom_pixel = self.hitbox_h - 1
         self.hitbox_type = CollisionTest.PASSABLE
         self.offset_x = -4
         self.offset_y = 0

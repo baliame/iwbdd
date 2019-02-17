@@ -15,8 +15,10 @@ layout(location = 1) out vec2 out_uv;
 layout(location = 2) out vec2 out_screen_uv;
 layout(location = 3) out vec2 out_screen_pos;
 
+
 uniform mat4 view;
 uniform mat4 model;
+
 
 void main() {
     out_pos = view * model * vec4(in_pos, 0, 1);
@@ -215,11 +217,20 @@ layout(location = 2) in vec2 in_screen_uv;
 layout(location = 0) out vec4 out_color;
 
 void main() {
-    vec2 dist_uv = vec2(in_screen_uv.x + (in_uv.x - 0.5) * (in_uv.x - 0.5) * 0.2, in_screen_uv.y + (in_uv.y - 0.5) * (in_uv.y - 0.5) * 0.2);
-    vec4 scr = texture(screen, in_screen_uv);
-    vec4 bg = texture(background, dist_uv);
     float ux = in_uv.x * 2 - 1;
+    float sgnx = 1;
+    if (ux < 0) {
+        sgnx = -1;
+    }
     float uy = in_uv.y * 2 - 1;
+    float sgny = 1;
+    if (uy < 0) {
+        sgny = -1;
+    }
+    vec2 dist_uv = vec2(in_screen_uv.x + sgnx * (1 - ux * ux * ux * ux) * 0.02, in_screen_uv.y + sgny * (1 - uy * uy * uy * uy) * 0.03);
+    vec4 scr = texture(screen, in_screen_uv);
+    vec4 scr2 = texture(screen, dist_uv);
+    vec4 bg = texture(background, dist_uv);
     float r2 = ux * ux + uy * uy;
     if (r2 > 1.05) {
         out_color = scr;
@@ -302,15 +313,24 @@ layout(location = 0) out vec4 out_color;
 
 void main() {
     vec4 scr = texture(screen, in_screen_uv);
-    if (in_uv.y < 0.45) {
+    if (in_uv.y < 0.47) {
         out_color = scr;
-    } else if (in_uv.y < 0.55) {
+    } else if (in_uv.y < 0.50) {
         out_color = vec4(0, 0, 0, 1);
     } else {
-        vec2 dist_uv = vec2(in_screen_uv.x + (in_uv.x - 0.5) * (in_uv.x - 0.5) * 0.2, in_screen_uv.y + (in_uv.y - 0.5) * (in_uv.y - 0.5) * 0.2);
-        vec4 bg = texture(background, dist_uv);
         float ux = in_uv.x * 2 - 1;
+        float sgnx = 1;
+        if (ux < 0) {
+            sgnx = -1;
+        }
         float uy = in_uv.y * 2 - 1;
+        float sgny = 1;
+        if (uy < 0) {
+            sgny = -1;
+        }
+        vec2 dist_uv = vec2(in_screen_uv.x + sgnx * (1 - ux * ux * ux * ux) * 0.02, in_screen_uv.y + sgny * (1 - uy * uy * uy * uy) * 0.03);
+        vec4 scr2 = texture(screen, dist_uv);
+        vec4 bg = texture(background, dist_uv);
         float r2 = ux * ux + uy * uy;
         if (r2 > 1.05) {
             out_color = scr;
@@ -339,7 +359,7 @@ layout(location = 0) out vec4 out_color;
 
 void main() {
     vec4 scr = texture(screen, in_screen_uv);
-    if (in_uv.y < 0.5) {
+    if (in_uv.y < 0.48) {
         out_color = scr;
     } else {
         float ux = in_uv.x * 2 - 1;
@@ -383,7 +403,7 @@ _GSH_progs = {
     "GSHP_lens": {GL_VERTEX_SHADER: "GSH_vtx", GL_FRAGMENT_SHADER: "GSH_lens"},
     "GSHP_lens_off": {GL_VERTEX_SHADER: "GSH_vtx", GL_FRAGMENT_SHADER: "GSH_lens_off"},
     "GSHP_lens_coll": {GL_VERTEX_SHADER: "GSH_vtx", GL_FRAGMENT_SHADER: "GSH_lens_coll"},
-    "GSHP_lens_semi": {GL_VERTEX_SHADER: "GSH_vtx", GL_FRAGMENT_SHADER: "GSH_lens"},
+    "GSHP_lens_semi": {GL_VERTEX_SHADER: "GSH_vtx", GL_FRAGMENT_SHADER: "GSH_lens_semi"},
     "GSHP_lens_semi_coll": {GL_VERTEX_SHADER: "GSH_vtx", GL_FRAGMENT_SHADER: "GSH_lens_semi_coll"},
 }
 GSH_compiled = {}

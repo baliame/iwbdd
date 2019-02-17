@@ -28,6 +28,7 @@ class Controls(IntEnum):
     RESET = 4
     SKIP = 5
     DEV1 = 16
+    DEV2 = 17
 
 
 # 4 tiles = 96 px
@@ -66,6 +67,7 @@ class Controller:
         Controls.RESET: glfw.KEY_R,
         Controls.SKIP: glfw.KEY_S,
         Controls.DEV1: glfw.KEY_K,
+        Controls.DEV2: glfw.KEY_L,
     }
     movement_speed = 2
     default_music_volume = 0.8
@@ -504,6 +506,8 @@ class Controller:
             xdir = 2 if sgnx < 0 else 0
             if self.player.cached_collision[xdir][0] & COLLISIONTEST_PREVENTS_MOVEMENT:
                 if self.player.cached_collision[xdir][1] != 1 or self.player.cached_collision[xdir][2] not in (0, self.player.bottom_pixel) or (self.player.cached_collision[1][0] & COLLISIONTEST_PREVENTS_MOVEMENT and self.player.cached_collision[xdir][2] == self.player.bottom_pixel) or (self.player.cached_collision[3][0] & COLLISIONTEST_PREVENTS_MOVEMENT and self.player.cached_collision[xdir][2] == 0):
+                    if keys[self.keybindings[Controls.DEV2]]:
+                        print(self.player.cached_collision)
                     prevent_x = True
                     dest[0] = self.player.x
                 elif self.player.cached_collision[xdir][2] == self.player.bottom_pixel and not self.player.cached_collision[1][0] & COLLISIONTEST_PREVENTS_MOVEMENT:

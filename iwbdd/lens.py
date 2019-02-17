@@ -48,6 +48,7 @@ class ActivatableLens(LensParent):
                 if scr == ctrl.player.screen and not ctrl.player.dead:
                     coll = scr.test_screen_collision(ctrl.player.x, ctrl.player.y, (ctrl.player.hitbox_w, ctrl.player.hitbox_h))
                     if coll[4][0] & COLLISIONTEST_PREVENTS_MOVEMENT:
+                        # if coll[0][1] > 0 and
                         ctrl.player.die()
         else:
             if not self.active:
@@ -167,7 +168,7 @@ class MovingLens(LensParent):
 
     def draw(self, wnd):
         ix = int(self.x)
-        iy = int(self.y)
+        iy = int(self.y + self.radius * 2)
         if not self.hidden:
             draw_x = ix + self._offset_x
             draw_y = iy + self._offset_y
@@ -187,7 +188,7 @@ class MovingLens(LensParent):
         if self.hidden:
             return
         ix = int(self.x)
-        iy = int(self.y)
+        iy = int(self.y + self.radius * 2)
         draw_x = ix + self._offset_x
         draw_y = iy + self._offset_y
         self.model = Mat4.scaling(self.radius * 2, self.radius * 2).translate(draw_x, wnd.h - draw_y)

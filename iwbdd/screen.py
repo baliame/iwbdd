@@ -409,8 +409,6 @@ class Screen:
                         px = (pixels[base_idx] << 16) + (pixels[base_idx + 1] << 8) + pixels[base_idx + 2]
                         if px in Screen.collision_test_flags or (extra_flags is not None and px in extra_flags):
                             flag = Screen.collision_test_flags[px]
-                            if idx == 4 and flag & CollisionTest.DEADLY:
-                                print(cx + cxo, cy + cyo, "{0:02X}".format(px), flag)
                             coll[idx] = (coll[idx][0] | Screen.collision_test_flags[px], coll[idx][1], coll[idx][2], coll[idx][3])
                             if flag & COLLISIONTEST_PREVENTS_MOVEMENT:
                                 cnt = coll[idx][1] + 1
