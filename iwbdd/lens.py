@@ -13,6 +13,7 @@ from OpenGL.arrays.vbo import VBO
 class LensParent(Object):
     exclude_from_object_editor = True
     saveable = False
+    coll_check = False
 
     def __init__(self, screen, x=0, y=0, init_dict=None):
         super().__init__(screen, x, y, init_dict)
@@ -45,11 +46,12 @@ class ActivatableLens(LensParent):
             if self.active:
                 self.active = 0
                 scr.objects_dirty = True
-                if scr == ctrl.player.screen and not ctrl.player.dead:
-                    coll = scr.test_screen_collision(ctrl.player.x, ctrl.player.y, (ctrl.player.hitbox_w, ctrl.player.hitbox_h))
-                    if coll[4][0] & COLLISIONTEST_PREVENTS_MOVEMENT:
-                        # if coll[0][1] > 0 and
-                        ctrl.player.die()
+                #if scr == ctrl.player.screen and not ctrl.player.dead and not LensParent.coll_check:
+                #    coll = scr.test_screen_collision(ctrl.player.x, ctrl.player.y, (ctrl.player.hitbox_w, ctrl.player.hitbox_h))
+                #    if coll[4][0] & COLLISIONTEST_PREVENTS_MOVEMENT:
+                #        # if coll[0][1] > 0 and
+                #        ctrl.player.die()
+                #        LensParent.coll_check = True
         else:
             if not self.active:
                 self.active = 1
@@ -142,8 +144,11 @@ class MovingLens(LensParent):
         self.y = self.source[1] + int(self.t * (self.destination[1] - self.source[1]))
         self.model = Mat4.scaling(self.radius * 2, self.radius * 2).translate(int(self.x) + self._offset_x, Window.instance.h - int(self.y) + self._offset_y)
         self.editor_drawing = False
+        self.cntr = 0
+        self.acc = 0
 
     def tick(self, scr, ctrl):
+        self.cntr += 1
         if self.forward:
             self.t += self.speed
             if self.t > 1:
@@ -154,17 +159,27 @@ class MovingLens(LensParent):
             if self.t < 0:
                 self.t = -self.t
                 self.forward = 1
+        self.acc = 0
+        iox = int(self.x)
+        ioy = int(self.y)
         nx = self.source[0] + int(self.t * (self.destination[0] - self.source[0]))
         ny = self.source[1] + int(self.t * (self.destination[1] - self.source[1]))
         self.dx = nx - self.x
         self.dy = ny - self.y
         self.x = nx
         self.y = ny
-        scr.objects_dirty = True
-        if scr == ctrl.player.screen and not ctrl.player.dead:
-            coll = scr.test_screen_collision(ctrl.player.x, ctrl.player.y, (ctrl.player.hitbox_w, ctrl.player.hitbox_h))
-            if coll[4][0] & COLLISIONTEST_PREVENTS_MOVEMENT:
-                ctrl.player.die()
+        if iox != int(nx) or ioy != int(ny):
+            if self.cntr > 3:
+                scr.objects_dirty = True
+                self.cntr = 0
+            else:
+                self.cntr += 1
+
+        #if scr == ctrl.player.screen and not ctrl.player.dead and not LensParent.coll_check:
+        #    coll = scr.test_screen_collision(ctrl.player.x, ctrl.player.y, (ctrl.player.hitbox_w, ctrl.player.hitbox_h))
+        #    if coll[4][0] & COLLISIONTEST_PREVENTS_MOVEMENT:
+        #        ctrl.player.die()
+        #        LensParent.coll_check = True
 
     def draw(self, wnd):
         ix = int(self.x)

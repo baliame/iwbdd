@@ -167,7 +167,7 @@ class MainLoop:
         event = poevent.button(x, y, button, action, mods)
 
         if cb is not None:
-            cb(self.window.scale_event(event), self)
+            cb(event, self)
 
     def set_mouse_motion_handler(self, cb):
         self.mouse_motion_handler = cb
@@ -175,7 +175,7 @@ class MainLoop:
     def handle_motion(self, wnd, x, y):
         if self.mouse_motion_handler is not None:
             event = poevent.motion(x, y, self.mouse_buttons)
-            self.mouse_motion_handler(self.window.scale_event(event), self)
+            self.mouse_motion_handler(event, self)
 
     def add_atexit_callback(self, cb):
         self.atexit.append(cb)

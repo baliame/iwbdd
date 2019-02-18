@@ -3,7 +3,7 @@ import struct
 from io import BytesIO
 import numpy as np
 from PIL import Image
-from .pygame_oo.texture import TextureSet2D
+from .pygame_oo.texture import TextureSet2D, Texture2D
 from .pygame_oo.shader import Mat4, Vec4
 from .pygame_oo.game_shaders import GSHp
 from .pygame_oo.window import Window
@@ -64,6 +64,8 @@ class Tileset:
         self.uv_arrays = VBO(np.array([0, 0, 1, 0, 0, 1, 1, 1], dtype='f'))
         self.wh_arrays = VBO(np.array([0, 0, 1, 0, 0, 2, 1, 2], dtype='f'))
         self.vao = glGenVertexArrays(1)
+        self.editor_display = (-1, -1, -1, -1)
+        self.editor_display_tileids = None
         glBindVertexArray(self.vao)
         self.unit_arrays.bind()
         glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, self.unit_arrays)
@@ -76,6 +78,20 @@ class Tileset:
             self.read_tileset_data(reader)
         if self.tileset_id == Tileset.collision_tileset:
             Tileset.collision_tileset = self
+
+    def set_editor_display(self, x, y, w, h):
+        if self.editor_display != (x, y, w, h):
+            self.editor_display = (x, y, w, h)
+            self.editor_display_tileids = Texture2D(w, h, np.zeros((h, w), dtype=np.uint32), arr_type=GL_UNSIGNED_INT, arr_colors=GL_RED_INTEGER, dest_colors=GL_R32UI, magf=GL_NEAREST, minf=GL_NEAREST)
+            tile_idx = np.zeros((h, w), dtype=np.uint32)
+            for cy in range(y, y + h):
+                for cx in range(x, x + w):
+                    if cx >= self.tiles_w or cy >= self.tiles_h or cx < 0 or cy < 0:
+                        tile_idx[h - (cy - y + 1)][cx - x] = -1
+                    else:
+                        tile_idx[h - (cy - y + 1)][cx - x] = cx + cy * self.stride
+            self.editor_display_tileids.set_image(tile_idx, GL_UNSIGNED_INT, GL_RED_INTEGER, dest_colors=GL_R32UI, debug=True)
+        return self.editor_display_tileids
 
     def read_tileset_data(self, reader):
         self.tileset_id = struct.unpack('<L', eofc_read(reader, 4))[0]
@@ -100,10 +116,10 @@ class Tileset:
                     t.set_image(idx, np.frombuffer(img.tobytes(), dtype=np.uint8), data_colors=GL_RGB if len(bands) == 3 else GL_RGBA, data_type=GL_UNSIGNED_BYTE)
                     idx += 1
 
-    def draw_to(self, x, y, draw_x, draw_y):
+    def draw_to(self, x, y, draw_x, draw_y, w=None, h=None):
         with GSHp('GSHP_render_sheet') as prog:
             Window.instance.setup_render(prog)
-            render_loc = self.model * Mat4.scaling(Tileset.TILE_W, Tileset.TILE_H).translate(draw_x, draw_y)
+            render_loc = self.model * Mat4.scaling(Tileset.TILE_W if w is None else w, Tileset.TILE_H if h is None else h).translate(draw_x, draw_y)
             prog.uniform('colorize', self.vec_buf)
             tex_idx = float(x + self.stride * y)
             prog.uniform('tex_idx', tex_idx)

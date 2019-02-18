@@ -119,8 +119,26 @@ class Spritesheet:
     def draw_cell_to(self, x, y, draw_x, draw_y, transparency):
         with GSHp('GSHP_render_sheet') as prog:
             render_loc = self.model * Mat4.translation(draw_x, Window.instance.h - draw_y)
-            # render_loc = Mat4.translation(draw_x, draw_y) * self.model
-            # render_loc = self.model
+            self.vec_buf.load_rgb_a(self.variant_color, self.variant_alpha)
+            tex_idx = float(x + self.stride * y)
+
+            Window.instance.setup_render(prog)
+
+            prog.uniform('colorize', self.vec_buf)
+            prog.uniform('tex_idx', tex_idx)
+            prog.uniform('model', render_loc)
+
+            self.tex.bindtexunit(0)
+            transparency.bindtexunit(1)
+
+            glBindVertexArray(self.vao)
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
+            logger.log_draw()
+            glBindVertexArray(0)
+
+    def draw_cell_scaled(self, x, y, draw_x, draw_y, w, h, transparency):
+        with GSHp('GSHP_render_sheet') as prog:
+            render_loc = Mat4.scaling(w, h).translate(draw_x, Window.instance.h - draw_y)
             self.vec_buf.load_rgb_a(self.variant_color, self.variant_alpha)
             tex_idx = float(x + self.stride * y)
 

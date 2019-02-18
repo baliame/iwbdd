@@ -33,12 +33,16 @@ class Window:
         glfw.make_context_current(self.glw)
         GSH_init()
         self.fbo = Framebuffer(w, h, name='Window alpha buffer')
+        self.layers = []
         self.font = Font(self, 'arial.ttf')
         self.graphics = Graphics(self)
         self.view = Mat4.scaling(2.0 / viewport_w, 2.0 / viewport_h, 1).translate(-1, -1)
         self.full_view = Mat4.scaling(2.0 / w, 2.0 / h, 1).translate(-1, -1)
+        self.full = False
         glDisable(GL_DEPTH_TEST)
         print("OpenGL: " + str(glGetString(GL_VERSION)))
+        glViewport(0, 0, self.w, self.h)
+        self.use_game_viewport()
 
     def update(self):
         pass
@@ -49,11 +53,16 @@ class Window:
     def new_render(self):
         pass
 
+    def add_layer(self, layer):
+        self.layers.append(layer)
+
     def use_game_viewport(self):
-        glViewport(0, 0, self.viewport_w, self.viewport_h)
+        #glViewport(0, 0, self.viewport_w, self.viewport_h)
+        self.full = False
 
     def use_full_viewport(self):
-        glViewport(0, 0, self.w, self.h)
+        #glViewport(0, 0, self.w, self.h)
+        self.full = True
 
     def setup_render(self, prog, target_fbo=None):
         if prog is None:
@@ -61,13 +70,13 @@ class Window:
         if Framebuffer.bound is not None:
             Framebuffer.bound.new_render_pass()
             Framebuffer.bound.bindtexunit(1)
-        prog.uniform('view', self.view)
+        prog.uniform('view', self.full_view if self.full else self.view)
 
     def pre_blit(self):
         with self.fbo as fbo:
             self.use_full_viewport()
-            self.graphics.render(self, fbo)
-            self.font.render(self, fbo)
+            for layer in self.layers:
+                layer.render(self, fbo)
 
     def __enter__(self):
         self.use_full_viewport()
@@ -82,6 +91,12 @@ class Window:
         self.pre_blit()
         self.fbo.blit_to_window()
         glfw.swap_buffers(self.glw)
+
+    def width(self):
+        return self.w if self.full else self.viewport_w
+
+    def height(self):
+        return self.h if self.full else self.viewport_h
 
 
 class WindowSection(Window):

@@ -164,6 +164,9 @@ class Object:
                 logger.log_draw()
                 glBindVertexArray(0)
 
+    def draw_dynamic(self, arr):
+        pass
+
     def tick(self, scr, ctrl):
         pass
 
@@ -433,7 +436,7 @@ class Button(Object):
             "active": (False, (2, 0)),
         }
         self.state = "default"
-        self._offset_x = 4
+        self._offset_x = -4
         self._offset_y = 4
 
     def tick(self, scr, ctrl):

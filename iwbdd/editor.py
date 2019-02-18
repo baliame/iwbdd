@@ -5,12 +5,15 @@ from .screen import Screen, Collision, Layer, LayerNames
 from .world import World
 from .game import Controller
 from .object import Object
+from .pygame_oo.font import Font
+from .pygame_oo.graphics import Graphics
 from .common import mousebox, CollisionTest, SCREEN_SIZE_W, SCREEN_SIZE_H, COLLISIONTEST_COLORS
 from .audio_data import Audio
 from .bossfight import Boss
 from enum import IntEnum
+import glfw
 import pygame
-from pygame.locals import K_f, K_m, K_r, K_q, K_s, K_x, K_n, K_LEFT, K_RIGHT, K_UP, K_DOWN, K_PAGEUP, K_PAGEDOWN, K_DELETE, K_RETURN, K_BACKSPACE, K_c, K_v, K_o, K_i
+from OpenGL.GL import *
 
 
 class _mousetev:
@@ -70,66 +73,39 @@ class Editor:
         Editor.tsby = Editor.ts_display_y + 70
 
     key_mapping = {
-        "reset_simulation": K_q,
-        "reset_simulation_to_save": K_r,
-        "frame_advance": K_f,
-        "mode": K_m,
-        "switch_to_simulation": K_s,
-        "switch_to_frame_advance": K_f,
-        "exit_simulation": K_x,
-        "toggle_collision_render": K_m,
-        "new_screen": K_n,
-        "toolbox_left": K_LEFT,
-        "toolbox_right": K_RIGHT,
-        "toolbox_up": K_UP,
-        "toolbox_down": K_DOWN,
-        "next_screen": K_PAGEDOWN,
-        "previous_screen": K_PAGEUP,
-        "delete_screen": K_DELETE,
-        "confirm_prompt": K_RETURN,
-        "cancel_prompt": K_BACKSPACE,
-        "sm_cut": K_x,
-        "sm_copy": K_c,
-        "sm_paste": K_v,
-        "sm_fill_terrain": K_i,
-        "sm_fill_collision": K_o,
+        "reset_simulation": glfw.KEY_Q,
+        "reset_simulation_to_save": glfw.KEY_R,
+        "frame_advance": glfw.KEY_F,
+        "mode": glfw.KEY_M,
+        "switch_to_simulation": glfw.KEY_S,
+        "switch_to_frame_advance": glfw.KEY_F,
+        "exit_simulation": glfw.KEY_X,
+        "toggle_collision_render": glfw.KEY_M,
+        "new_screen": glfw.KEY_N,
+        "toolbox_left": glfw.KEY_LEFT,
+        "toolbox_right": glfw.KEY_RIGHT,
+        "toolbox_up": glfw.KEY_UP,
+        "toolbox_down": glfw.KEY_DOWN,
+        "next_screen": glfw.KEY_PAGE_DOWN,
+        "previous_screen": glfw.KEY_PAGE_UP,
+        "delete_screen": glfw.KEY_DELETE,
+        "confirm_prompt": glfw.KEY_ENTER,
+        "cancel_prompt": glfw.KEY_BACKSPACE,
+        "sm_cut": glfw.KEY_X,
+        "sm_copy": glfw.KEY_C,
+        "sm_paste": glfw.KEY_V,
+        "sm_fill_terrain": glfw.KEY_I,
+        "sm_fill_collision": glfw.KEY_O,
     }
     mode_count = 2
-    collision_editor_draw = {
-        Collision.PASSABLE: lambda wnd: True,
-        Collision.SOLID_TILE: lambda wnd: pygame.draw.rect(wnd.display, (0, 0, 255), pygame.Rect(Editor.tslx, Editor.tsty, 70, 70)),
-        Collision.SOLID_HALF_DOWN: lambda wnd: pygame.draw.rect(wnd.display, (0, 0, 255), pygame.Rect(Editor.tslx, Editor.tshy1, 70, 36)),
-        Collision.SOLID_HALF_UP: lambda wnd: pygame.draw.rect(wnd.display, (0, 0, 255), pygame.Rect(Editor.tslx, Editor.tsty, 70, 36)),
-        Collision.SOLID_SLOPE_UPLEFT: lambda wnd: pygame.draw.polygon(wnd.display, (0, 0, 255), [(Editor.tslx, Editor.tsty), (Editor.tsrx, Editor.tsby), (Editor.tslx, Editor.tsby)]),
-        Collision.SOLID_SLOPE_UPRIGHT: lambda wnd: pygame.draw.polygon(wnd.display, (0, 0, 255), [(Editor.tsrx, Editor.tsty), (Editor.tslx, Editor.tsby), (Editor.tsrx, Editor.tsby)]),
-        Collision.DEADLY_TILE: lambda wnd: pygame.draw.rect(wnd.display, (255, 0, 0), pygame.Rect(Editor.tslx, Editor.tsty, 70, 70)),
-        Collision.DEADLY_SPIKE_UP: lambda wnd: pygame.draw.polygon(wnd.display, (255, 0, 0), [(Editor.tslx, Editor.tsby), (Editor.tshx1, Editor.tsty), (Editor.tshx2, Editor.tsty), (Editor.tsrx, Editor.tsby)]),
-        Collision.DEADLY_SPIKE_DOWN: lambda wnd: pygame.draw.polygon(wnd.display, (255, 0, 0), [(Editor.tslx, Editor.tsty), (Editor.tshx1, Editor.tsby), (Editor.tshx2, Editor.tsby), (Editor.tsrx, Editor.tsty)]),
-        Collision.DEADLY_SPIKE_LEFT: lambda wnd: pygame.draw.polygon(wnd.display, (255, 0, 0), [(Editor.tslx, Editor.tsty), (Editor.tsrx, Editor.tshy1), (Editor.tsrx, Editor.tshy2), (Editor.tslx, Editor.tsby)]),
-        Collision.DEADLY_SPIKE_RIGHT: lambda wnd: pygame.draw.polygon(wnd.display, (255, 0, 0), [(Editor.tsrx, Editor.tsty), (Editor.tslx, Editor.tshy1), (Editor.tslx, Editor.tshy2), (Editor.tsrx, Editor.tsby)]),
-        Collision.SOLID_HALF_UP_DEADLY_HALF_DOWN: lambda wnd: pygame.draw.rect(wnd.display, (0, 0, 255), pygame.Rect(Editor.tslx, Editor.tsty, 70, 35)) and pygame.draw.rect(wnd.display, (255, 0, 0), pygame.Rect(Editor.tslx, Editor.tshy2, 70, 35)),
-        Collision.SOLID_HALF_DOWN_DEADLY_HALF_UP: lambda wnd: pygame.draw.rect(wnd.display, (255, 0, 0), pygame.Rect(Editor.tslx, Editor.tsty, 70, 35)) and pygame.draw.rect(wnd.display, (0, 0, 255), pygame.Rect(Editor.tslx, Editor.tshy2, 70, 35)),
-        Collision.SOLID_HALF_LEFT_DEADLY_HALF_RIGHT: lambda wnd: pygame.draw.rect(wnd.display, (0, 0, 255), pygame.Rect(Editor.tslx, Editor.tsty, 35, 70)) and pygame.draw.rect(wnd.display, (255, 0, 0), pygame.Rect(Editor.ts_display_x + 84, Editor.tsty, 35, 70)),
-        Collision.SOLID_HALF_RIGHT_DEADLY_HALF_LEFT: lambda wnd: pygame.draw.rect(wnd.display, (255, 0, 0), pygame.Rect(Editor.tslx, Editor.tsty, 35, 70)) and pygame.draw.rect(wnd.display, (0, 0, 255), pygame.Rect(Editor.ts_display_x + 84, Editor.tsty, 35, 70)),
-        Collision.CONVEYOR_EAST_SINGLE_SPEED: lambda wnd: pygame.draw.rect(wnd.display, COLLISIONTEST_COLORS[CollisionTest.CONVEYOR_EAST_SINGLE_SPEED], pygame.Rect(Editor.tslx, Editor.tsty, 70, 70)) and pygame.draw.polygon(wnd.display, COLLISIONTEST_COLORS[CollisionTest.SOLID], [(Editor.tslx + 4, Editor.tsty + 4), (Editor.tsrx - 4, Editor.tshy1), (Editor.tsrx - 4, Editor.tshy2), (Editor.tslx + 4, Editor.tsby - 4)]),
-        Collision.CONVEYOR_NORTH_SINGLE_SPEED: lambda wnd: pygame.draw.rect(wnd.display, COLLISIONTEST_COLORS[CollisionTest.CONVEYOR_NORTH_SINGLE_SPEED], pygame.Rect(Editor.tslx, Editor.tsty, 70, 70)) and pygame.draw.polygon(wnd.display, COLLISIONTEST_COLORS[CollisionTest.SOLID], [(Editor.tslx + 4, Editor.tsby - 4), (Editor.tshx1, Editor.tsty + 4), (Editor.tshx2, Editor.tsty + 4), (Editor.tsrx - 4, Editor.tsby - 4)]),
-        Collision.CONVEYOR_WEST_SINGLE_SPEED: lambda wnd: pygame.draw.rect(wnd.display, COLLISIONTEST_COLORS[CollisionTest.CONVEYOR_WEST_SINGLE_SPEED], pygame.Rect(Editor.tslx, Editor.tsty, 70, 70)) and pygame.draw.polygon(wnd.display, COLLISIONTEST_COLORS[CollisionTest.SOLID], [(Editor.tsrx - 4, Editor.tsty + 4), (Editor.tslx + 4, Editor.tshy1), (Editor.tslx + 4, Editor.tshy2), (Editor.tsrx - 4, Editor.tsby - 4)]),
-        Collision.CONVEYOR_SOUTH_SINGLE_SPEED: lambda wnd: pygame.draw.rect(wnd.display, COLLISIONTEST_COLORS[CollisionTest.CONVEYOR_SOUTH_SINGLE_SPEED], pygame.Rect(Editor.tslx, Editor.tsty, 70, 70)) and pygame.draw.polygon(wnd.display, COLLISIONTEST_COLORS[CollisionTest.SOLID], [(Editor.tslx + 4, Editor.tsty + 4), (Editor.tshx1, Editor.tsby - 4), (Editor.tshx2, Editor.tsby - 4), (Editor.tsrx - 4, Editor.tsty + 4)]),
-        Collision.SOLID_HALF_LEFT: lambda wnd: pygame.draw.rect(wnd.display, (0, 0, 255), pygame.Rect(Editor.tslx, Editor.tsty, 36, 70)),
-        Collision.SOLID_HALF_RIGHT: lambda wnd: pygame.draw.rect(wnd.display, (0, 0, 255), pygame.Rect(Editor.tshx1, Editor.tsty, 36, 70)),
-        Collision.BOSSFIGHT_INIT_TRIGGER: lambda wnd: pygame.draw.rect(wnd.display, (128, 128, 0), pygame.Rect(Editor.tslx, Editor.tsty, 70, 70)),
-        Collision.SOLID_BEAM_UPRIGHT_PART_1: lambda wnd: pygame.draw.polygon(wnd.display, COLLISIONTEST_COLORS[CollisionTest.SOLID], [(Editor.tslx, Editor.tsby), (Editor.tslx, Editor.tshy2), (Editor.tshx1, Editor.tsty), (Editor.tsrx, Editor.tsty)]),
-        Collision.SOLID_BEAM_UPRIGHT_PART_2: lambda wnd: pygame.draw.polygon(wnd.display, COLLISIONTEST_COLORS[CollisionTest.SOLID], [(Editor.tsrx, Editor.tsby), (Editor.tsrx, Editor.tshy2), (Editor.tshx2, Editor.tsby)]),
-        Collision.SOLID_BEAM_UPLEFT_PART_1: lambda wnd: pygame.draw.polygon(wnd.display, COLLISIONTEST_COLORS[CollisionTest.SOLID], [(Editor.tslx, Editor.tsty), (Editor.tshx1, Editor.tsty), (Editor.tsrx, Editor.tshy2), (Editor.tsrx, Editor.tsby)]),
-        Collision.SOLID_BEAM_UPLEFT_PART_2: lambda wnd: pygame.draw.polygon(wnd.display, COLLISIONTEST_COLORS[CollisionTest.SOLID], [(Editor.tslx, Editor.tsby), (Editor.tslx, Editor.tshy2), (Editor.tshx1 - 1, Editor.tsby)]),
-    }
 
     def __init__(self, world_file, main_loop):
         if Editor.instance is not None:
             raise RuntimeError("Editor must be a singleton.")
         Editor.instance = self
+        self.font = Font(main_loop.window, "cour.ttf")
+        self.graphics = Graphics(main_loop.window)
         Editor.calc()
-        self.font = pygame.font.SysFont('Courier New', 12)
 
         main_loop.add_render_callback(Editor.render_elements_callback)
         main_loop.add_atexit_callback(Editor.atexit_callback)
@@ -181,7 +157,6 @@ class Editor:
             3: False,
         }
         self.collision_editor = 0
-        self.screen_seg = main_loop.segment_window(0, 0, SCREEN_SIZE_W, SCREEN_SIZE_H)
         self.hide_objects_in_terrain_modes = False
         self.only_render_current_layer = False
 
@@ -336,6 +311,7 @@ class Editor:
         self.edited_world.screens[self.edited_screen.screen_id] = self.edited_screen
 
     def build_render_cache(self):
+        return
         passive_color = (128, 128, 128)
         active_color = (255, 255, 255)
         self.render_cache = {
@@ -392,101 +368,92 @@ class Editor:
         self.render_elements(wnd)
 
     def render_elements(self, wnd):
-        wnd.display.blit(self.render_cache["mode"], (1440, 320))
-        passive_color = (128, 128, 128)
-        active_color = (255, 255, 255)
-        wnd.display.blit(self.render_cache["terrain-active"] if self.editing_mode == EditingMode.TERRAIN else self.render_cache["terrain-passive"], (1500, 320))
-        wnd.display.blit(self.render_cache["collision-active"] if self.editing_mode == EditingMode.COLLISION else self.render_cache["collision-passive"], (1500, 340))
-        wnd.display.blit(self.render_cache["selection-active"] if self.editing_mode == EditingMode.SELECTION else self.render_cache["selection-passive"], (1500, 360))
-        wnd.display.blit(self.render_cache["objects-active"] if self.editing_mode == EditingMode.OBJECTS else self.render_cache["objects-passive"], (1500, 380))
-        wnd.display.blit(self.render_cache["object-list-active"] if self.editing_mode == EditingMode.OBJECT_LIST else self.render_cache["object-list-passive"], (1500, 400))
-        wnd.display.blit(self.render_cache["boss-active"] if self.editing_mode == EditingMode.BOSS else self.render_cache["boss-passive"], (1500, 420))
-        pygame.draw.line(wnd.display, passive_color, (1500, 436), (1580, 436))
-        wnd.display.blit(self.render_cache["simulation-active"] if self.editing_mode == EditingMode.SIMULATION else self.render_cache["simulation-passive"], (1500, 440))
-        wnd.display.blit(self.render_cache["framebyframe-active"] if self.editing_mode == EditingMode.FRAMEBYFRAME else self.render_cache["framebyframe-passive"], (1500, 460))
-
-        save_now_text = self.font.render("[Save now]", True, active_color, 0)
-        wnd.display.blit(save_now_text, (1500, 728))
+        self.font.clear()
+        passive_color = (128, 128, 128, 255)
+        active_color = (255, 255, 255, 255)
+        self.font.draw("editor__MODE", "Mode:", 1440, 320, color=active_color)
+        self.font.draw("editor__MODE__TERRAIN", "Terrain", 1500, 320, color=active_color if self.editing_mode == EditingMode.TERRAIN else passive_color)
+        self.font.draw("editor__MODE__COLLISION", "Collision", 1500, 340, color=active_color if self.editing_mode == EditingMode.COLLISION else passive_color)
+        self.font.draw("editor__MODE__SELECTION", "Selection", 1500, 360, color=active_color if self.editing_mode == EditingMode.SELECTION else passive_color)
+        self.font.draw("editor__MODE__OBJECTS", "Objects", 1500, 380, color=active_color if self.editing_mode == EditingMode.OBJECTS else passive_color)
+        self.font.draw("editor__MODE__OBJECT_LIST", "Object List", 1500, 400, color=active_color if self.editing_mode == EditingMode.OBJECT_LIST else passive_color)
+        self.font.draw("editor__MODE__BOSS", "Boss", 1500, 420, color=active_color if self.editing_mode == EditingMode.BOSS else passive_color)
+        self.graphics.line("editor__MODE__SEPARATOR", 1500, 436, 1580, 436, color=passive_color)
+        self.font.draw("editor__MODE__SIMULATION", "Simulation", 1500, 440, color=active_color if self.editing_mode == EditingMode.SIMULATION else passive_color)
+        self.font.draw("editor__MODE__FRAMEBYFRAME", "Frame-by-frame", 1500, 460, color=active_color if self.editing_mode == EditingMode.FRAMEBYFRAME else passive_color)
+        self.font.draw("editor__SAVE", "[Save now]", 1500, 728, color=active_color)
 
         fps = self.main_loop.fps()
-        fpst = "{0}-fps".format(fps)
-        if fpst in self.render_cache:
-            fps_text = self.render_cache[fpst]
-        else:
-            fps_text = self.font.render("{0} FPS".format(self.main_loop.fps()), True, active_color, 0)
-            self.render_cache[fpst] = fps_text
-        wnd.display.blit(fps_text, (1540, 748))
-        dec_text = self.render_cache["dec"]
-        inc_text = self.render_cache["inc"]
-        decx_text = self.render_cache["decx"]
-        incx_text = self.render_cache["incx"]
-        decy_text = self.render_cache["decy"]
-        incy_text = self.render_cache["incy"]
+        self.font.draw("editor__FPS", "{0} fps".format(fps), 1500, 748, color=active_color)
 
         if self.editing_mode not in EditingModeLock:
-            if self.editing_mode != EditingMode.TERRAIN or not self.only_render_current_layer:
-                self.edited_screen.render_to_window(self.screen_seg)
-            else:
-                self.edited_screen.render_to_window(self.screen_seg, layer=self.terrain_layer)
+            with wnd:
+                wnd.use_game_viewport()
+                if self.editing_mode != EditingMode.TERRAIN or not self.only_render_current_layer:
+                    self.edited_screen.render_to_window(wnd)
+                else:
+                    self.edited_screen.render_to_window(wnd, layer=self.terrain_layer)
+                if (self.editing_mode in (EditingMode.TERRAIN, EditingMode.COLLISION) and not self.hide_objects_in_terrain_modes) or self.editing_mode in (EditingMode.OBJECTS, EditingMode.OBJECT_LIST):
+                    self.edited_screen.render_editor_objects(wnd)
+                if (self.editing_mode in (EditingMode.SELECTION, ) and self.sm_render_collisions) or (self.editing_mode in (EditingMode.COLLISION, )):
+                    self.edited_screen.render_collisions_to_window(wnd)
+                if self.edited_world.starting_screen_id == self.edited_screen.screen_id:
+                    self.controller.player.x = self.edited_world.start_x
+                    self.controller.player.y = self.edited_world.start_y
+                    if self.editing_mode in (EditingMode.TERRAIN, EditingMode.SELECTION, EditingMode.OBJECTS, EditingMode.OBJECT_LIST):
+                        self.controller.player.draw(wnd)
+                    elif self.editing_mode == EditingMode.COLLISION:
+                        self.controller.player.draw_as_hitbox(wnd, (0, 255, 0))
+                wnd.use_full_viewport()
+                self.background.draw(1080, 760, 160, 120)
+
             if self.editing_mode == EditingMode.TERRAIN:
-                if not self.hide_objects_in_terrain_modes:
-                    self.edited_screen.render_editor_objects(self.screen_seg)
-                pygame.draw.rect(wnd.display, (255, 255, 255), pygame.Rect(Editor.ts_display_x - 1, Editor.ts_display_y - 1, Editor.ts_view_w * Tileset.TILE_W + 2, Editor.ts_view_h * Tileset.TILE_H + 2))
-                self.tileset.draw_to(self.ts_view_x, self.ts_view_y, Editor.ts_view_w, Editor.ts_view_h, wnd.display, (Editor.ts_display_x, Editor.ts_display_y))
+                with wnd.fbo:
+                    tileids = self.tileset.set_editor_display(self.ts_view_x, self.ts_view_y, Editor.ts_view_w, Editor.ts_view_h)
+                    self.tileset.draw_full_screen(Editor.ts_display_x, Editor.ts_display_y, Editor.ts_view_w * Tileset.TILE_W, Editor.ts_view_h * Tileset.TILE_H, wnd.fbo, tileids)
+
+                self.graphics.box("editor__TERRAIN__TILESETBOX", Editor.ts_display_x - 1, Editor.ts_display_y - 1, Editor.ts_view_w * Tileset.TILE_W + 2, Editor.ts_view_h * Tileset.TILE_H + 2, color=active_color)
                 if self.ts_select_x >= self.ts_view_x and self.ts_select_y >= self.ts_view_y and self.ts_select_x < self.ts_view_x + Editor.ts_view_w and self.ts_select_y < self.ts_view_y + Editor.ts_view_h:
                     tile_id_x = self.ts_select_x - self.ts_view_x
                     tile_id_y = self.ts_select_y - self.ts_view_y
-                    dest = pygame.Rect(Editor.ts_display_x + tile_id_x * Tileset.TILE_W, Editor.ts_display_y + tile_id_y * Tileset.TILE_H, Tileset.TILE_W, Tileset.TILE_H)
-                    pygame.draw.rect(wnd.display, (255, 0, 0), dest, 1)
+                    self.graphics.box("editor__TERRAIN__DEST", Editor.ts_display_x + tile_id_x * Tileset.TILE_W, Editor.ts_display_y + tile_id_y * Tileset.TILE_H, Tileset.TILE_W, Tileset.TILE_H, color=(255, 0, 0, 255))
                 b_y = self.ts_display_y + Editor.ts_view_h * Tileset.TILE_H + 8
                 c_x = self.ts_display_x
                 for layer, label in LayerLabels.items():
-                    txt = self.font.render(label, True, active_color if self.terrain_layer == layer else passive_color, 0)
-                    wnd.display.blit(txt, (c_x, b_y))
+                    self.font.draw("editor__LAYER__LABEL__{0}".format(label), label, c_x, b_y, color=active_color if self.terrain_layer == layer else passive_color)
                     c_x += 50
-                orcr_txt = self.font.render("[Hide other layers]", True, active_color if self.only_render_current_layer else passive_color, 0)
-                wnd.display.blit(orcr_txt, (c_x, b_y))
+                self.font.draw("editor__LAYER__HIDE", "[Hide other layers]", c_x, b_y, color=active_color if self.only_render_current_layer else passive_color)
             elif self.editing_mode == EditingMode.COLLISION:
-                if not self.hide_objects_in_terrain_modes:
-                    self.edited_screen.render_editor_objects(self.screen_seg)
-                self.edited_screen.render_collisions_to_window(self.screen_seg)
-                wnd.display.blit(self.render_cache["coll-NONE"], (Editor.ts_display_x, Editor.ts_display_y))
-                wnd.display.blit(self.render_cache["coll-SOLID"], (Editor.ts_display_x, Editor.ts_display_y + 16))
-                wnd.display.blit(self.render_cache["coll-DEADLY"], (Editor.ts_display_x, Editor.ts_display_y + 32))
-                wnd.display.blit(self.render_cache["coll-CONVEYOR"], (Editor.ts_display_x, Editor.ts_display_y + 48))
-                wnd.display.blit(self.render_cache["coll-TRIGGER"], (Editor.ts_display_x, Editor.ts_display_y + 64))
-
-                pygame.draw.polygon(wnd.display, (255, 255, 255), [(Editor.ts_display_x + 48, Editor.ts_display_y + 84), (Editor.ts_display_x + 64, Editor.ts_display_y + 76), (Editor.ts_display_x + 64, Editor.ts_display_y + 92)])
-                pygame.draw.polygon(wnd.display, (255, 255, 255), [(Editor.ts_display_x + 120, Editor.ts_display_y + 84), (Editor.ts_display_x + 104, Editor.ts_display_y + 76), (Editor.ts_display_x + 104, Editor.ts_display_y + 92)])
-
-                pygame.draw.rect(wnd.display, (255, 255, 255), pygame.Rect(Editor.ts_display_x + 48, Editor.ts_display_y, 72, 72))
-                c = Collision(self.collision_editor)
-                if Collision(self.collision_editor) in Editor.collision_editor_draw:
-                    Editor.collision_editor_draw[c](wnd)
+                with wnd.fbo:
+                    Tileset.collision_tileset.draw_to(self.collision_editor, 0, Editor.tslx, Editor.tsby, w=70, h=70)
+                self.font.draw("editor__COLL__NONE", "NONE", Editor.ts_display_x, Editor.ts_display_y, (255, 255, 255, 255))
+                self.font.draw("editor__COLL__SOLID", "SOLID", Editor.ts_display_x, Editor.ts_display_y + 16, (0, 0, 255, 255))
+                self.font.draw("editor__COLL__DEADLY", "DEADLY", Editor.ts_display_x, Editor.ts_display_y + 32, (255, 0, 0, 255))
+                self.font.draw("editor__COLL__CONVEYOR", "CONVEY", Editor.ts_display_x, Editor.ts_display_y + 48, (0, 128, 0, 255))
+                self.font.draw("editor__COLL__TRIGGER", "BTRIG", Editor.ts_display_x, Editor.ts_display_y + 64, (128, 128, 0, 255))
+                self.graphics.polygon("editor__COLL__POLY1", [(Editor.ts_display_x + 48, Editor.ts_display_y + 84), (Editor.ts_display_x + 64, Editor.ts_display_y + 76), (Editor.ts_display_x + 64, Editor.ts_display_y + 92)], color=(255, 255, 255, 255))
+                self.graphics.polygon("editor__COLL__POLY2", [(Editor.ts_display_x + 120, Editor.ts_display_y + 84), (Editor.ts_display_x + 104, Editor.ts_display_y + 76), (Editor.ts_display_x + 104, Editor.ts_display_y + 92)], color=(255, 255, 255, 255))
+                self.graphics.box("editor__COLL__BOX", Editor.ts_display_x + 48, Editor.ts_display_y, 72, 72, (255, 255, 255, 255))
             elif self.editing_mode == EditingMode.SELECTION:
-                if not self.hide_objects_in_terrain_modes:
-                    self.edited_screen.render_editor_objects(self.screen_seg)
-                if self.sm_render_collisions:
-                    self.edited_screen.render_collisions_to_window(self.screen_seg)
                 if self.sm_selection_1 is not None and self.sm_selection_2 is not None:
-                    select_1_text = self.font.render("TL: ({0}, {1})".format(self.sm_selection_1[0], self.sm_selection_1[1]), True, (255, 255, 255), 0)
-                    select_2_text = self.font.render("BR: ({0}, {1})".format(self.sm_selection_2[0], self.sm_selection_2[1]), True, (255, 255, 255), 0)
-                    wnd.display.blit(select_1_text, (Editor.ts_display_x + 300, Editor.ts_display_y))
-                    wnd.display.blit(select_2_text, (Editor.ts_display_x + 300, Editor.ts_display_y + 20))
+                    self.font.draw("editor__SELECT__TL", "TL: ({0}, {1})".format(self.sm_selection_1[0], self.sm_selection_1[1]), Editor.ts_display_x + 300, Editor.ts_display_y, color=active_color)
+                    self.font.draw("editor__SELECT__BR", "BR: ({0}, {1})".format(self.sm_selection_2[0], self.sm_selection_2[1]), Editor.ts_display_x + 300, Editor.ts_display_y + 20, color=active_color)
                     w = (self.sm_selection_2[0] - self.sm_selection_1[0] + 1) * Tileset.TILE_W
                     h = (self.sm_selection_2[1] - self.sm_selection_1[1] + 1) * Tileset.TILE_H
-                    pygame.draw.rect(self.screen_seg.display, (255, 0, 0), pygame.Rect(self.sm_selection_1[0] * Tileset.TILE_W, self.sm_selection_1[1] * Tileset.TILE_H, w, h), 1)
-                wnd.display.blit(self.render_cache["rac-active"] if self.sm_render_collisions else self.render_cache["rac-passive"], (Editor.ts_display_x, Editor.ts_display_y))
+                    self.graphics.bow("editor__SELECT__SELECTION", self.sm_selection_1[0] * Tileset.TILE_W, self.sm_selection_1[1] * Tileset.TILE_H, w, h, color=(255, 0, 0, 255))
+
                 has_selection = self.sm_selection_1 is not None and self.sm_selection_2 is not None
-                wnd.display.blit(self.render_cache["sel-cut-active"] if has_selection else self.render_cache["sel-cut-passive"], (Editor.ts_display_x, Editor.ts_display_y + 20))
-                wnd.display.blit(self.render_cache["sel-copy-active"] if has_selection else self.render_cache["sel-copy-passive"], (Editor.ts_display_x, Editor.ts_display_y + 40))
-                wnd.display.blit(self.render_cache["sel-fillt-active"] if has_selection else self.render_cache["sel-fillt-passive"], (Editor.ts_display_x, Editor.ts_display_y + 60))
-                wnd.display.blit(self.tileset.image_surface, (Editor.ts_display_x - 20, Editor.ts_display_y + 58), pygame.Rect(self.ts_select_x * Tileset.TILE_W, self.ts_select_y * Tileset.TILE_H, Tileset.TILE_W, Tileset.TILE_H))
-                wnd.display.blit(self.render_cache["sel-fillc-active"] if has_selection else self.render_cache["sel-fillc-passive"], (Editor.ts_display_x, Editor.ts_display_y + 80))
-                Screen.collision_overlays[self.collision_editor](wnd.display, Editor.ts_display_x - 20, Editor.ts_display_y + 78)
-                wnd.display.blit(self.render_cache["sel-resett-active"] if has_selection else self.render_cache["sel-resett-passive"], (Editor.ts_display_x, Editor.ts_display_y + 100))
-                wnd.display.blit(self.render_cache["sel-resetc-active"] if has_selection else self.render_cache["sel-resetc-passive"], (Editor.ts_display_x, Editor.ts_display_y + 120))
-                wnd.display.blit(self.render_cache["sel-paste-active"] if self.sm_clipboard is not None else self.render_cache["sel-paste-passive"], (Editor.ts_display_x, Editor.ts_display_y + 140))
+
+                self.font.draw("editor__SELECT__RAC", "[Render as collisions]", Editor.ts_display_x, Editor.ts_display_y, color=active_color if self.sm_render_collisions else passive_color)
+                self.font.draw("editor__SELECT__CUT", "[Cut] (X)", Editor.ts_display_x, Editor.ts_display_y + 20, color=active_color if has_selection else passive_color)
+                self.font.draw("editor__SELECT__COPY", "[Copy] (C)", Editor.ts_display_x, Editor.ts_display_y + 40, color=active_color if has_selection else passive_color)
+                self.font.draw("editor__SELECT__FILLT", "[Fill with Terrain] (I)", Editor.ts_display_x, Editor.ts_display_y + 60, color=active_color if has_selection else passive_color)
+                self.font.draw("editor__SELECT__FILLC", "[Fill with Collision] (O)", Editor.ts_display_x, Editor.ts_display_y + 80, color=active_color if has_selection else passive_color)
+                self.font.draw("editor__SELECT__RESETT", "[Reset Terrain]", Editor.ts_display_x, Editor.ts_display_y + 100, color=active_color if has_selection else passive_color)
+                self.font.draw("editor__SELECT__RESETC", "[Reset Collision]", Editor.ts_display_x, Editor.ts_display_y + 120, color=active_color if has_selection else passive_color)
+                self.font.draw("editor__SELECT__PASTE", "[Paste] (V)", Editor.ts_display_x, Editor.ts_display_y + 140, color=active_color if has_selection and self.sm_clipboard is not None else passive_color)
+                #wnd.display.blit(self.tileset.image_surface, (Editor.ts_display_x - 20, Editor.ts_display_y + 58), pygame.Rect(self.ts_select_x * Tileset.TILE_W, self.ts_select_y * Tileset.TILE_H, Tileset.TILE_W, Tileset.TILE_H))
+                #Screen.collision_overlays[self.collision_editor](wnd.display, Editor.ts_display_x - 20, Editor.ts_display_y + 78)
             elif self.editing_mode == EditingMode.OBJECTS:
                 self.edited_screen.render_editor_objects(self.screen_seg)
                 if self.objed_selection is None:
@@ -553,85 +520,57 @@ class Editor:
                     selpt_txt = self.font.render("[Select point]", True, active_color, 0)
                     wnd.display.blit(selpt_txt, (Editor.ts_display_x + 120, Editor.ts_display_y + 60))
                     pygame.draw.rect(self.screen_seg.display, (255, 255, 0), pygame.Rect(self.edited_world.bossfight_spec[2], self.edited_world.bossfight_spec[3], 72, 72), 1)
-            if self.edited_world.starting_screen_id == self.edited_screen.screen_id:
-                self.controller.player.x = self.edited_world.start_x
-                self.controller.player.y = self.edited_world.start_y
-                if self.editing_mode in (EditingMode.TERRAIN, EditingMode.SELECTION, EditingMode.OBJECTS, EditingMode.OBJECT_LIST):
-                    self.controller.player.draw(self.screen_seg)
-                elif self.editing_mode == EditingMode.COLLISION:
-                    self.controller.player.draw_as_hitbox(self.screen_seg, (0, 255, 0))
 
-            scr_id_text = self.font.render("Screen id: {0}".format(self.edited_screen.screen_id), True, (255, 255, 255), 0)
-            wnd.display.blit(scr_id_text, (1080, 320))
+            self.font.draw("editor__COMMON__SCRID", "Screen id: {0}".format(self.edited_screen.screen_id), 1080, 320, active_color)
             e_tr = self.edited_screen.transitions[0]
-            e_tr_text = self.font.render("East transition: {0}".format("solid" if e_tr == 0 else e_tr), True, (255, 255, 255), 0)
-            wnd.display.blit(e_tr_text, (1080, 340))
-            wnd.display.blit(dec_text, (1270, 340))
-            wnd.display.blit(inc_text, (1290, 340))
+            self.font.draw("editor__COMMON__ETR", "East transition: {0}".format("solid" if e_tr == 0 else e_tr), 1080, 340, active_color)
+            self.font.draw("editor__COMMON__ETR-", "[-]", 1270, 340, active_color)
+            self.font.draw("editor__COMMON__ETR+", "[+]", 1290, 340, active_color)
             n_tr = self.edited_screen.transitions[1]
-            n_tr_text = self.font.render("North transition: {0}".format("solid" if n_tr == 0 else n_tr), True, (255, 255, 255), 0)
-            wnd.display.blit(n_tr_text, (1080, 360))
-            wnd.display.blit(dec_text, (1270, 360))
-            wnd.display.blit(inc_text, (1290, 360))
+            self.font.draw("editor__COMMON__NTR", "North transition: {0}".format("solid" if n_tr == 0 else n_tr), 1080, 360, active_color)
+            self.font.draw("editor__COMMON__NTR-", "[-]", 1270, 360, active_color)
+            self.font.draw("editor__COMMON__NTR+", "[+]", 1290, 360, active_color)
             w_tr = self.edited_screen.transitions[2]
-            w_tr_text = self.font.render("West transition: {0}".format("solid" if w_tr == 0 else w_tr), True, (255, 255, 255), 0)
-            wnd.display.blit(w_tr_text, (1080, 380))
-            wnd.display.blit(dec_text, (1270, 380))
-            wnd.display.blit(inc_text, (1290, 380))
+            self.font.draw("editor__COMMON__WTR", "West transition: {0}".format("solid" if w_tr == 0 else w_tr), 1080, 380, active_color)
+            self.font.draw("editor__COMMON__WTR-", "[-]", 1270, 380, active_color)
+            self.font.draw("editor__COMMON__WTR+", "[+]", 1290, 380, active_color)
             s_tr = self.edited_screen.transitions[3]
-            s_tr_text = self.font.render("South transition: {0}".format("solid" if s_tr == 0 else s_tr), True, (255, 255, 255), 0)
-            wnd.display.blit(s_tr_text, (1080, 400))
-            wnd.display.blit(dec_text, (1270, 400))
-            wnd.display.blit(inc_text, (1290, 400))
-            grav_x_text = self.font.render("Gravity X: {0:.2f}".format(self.edited_screen.gravity[0]), True, (255, 255, 255), 0)
-            wnd.display.blit(grav_x_text, (1080, 420))
-            wnd.display.blit(dec_text, (1270, 420))
-            wnd.display.blit(inc_text, (1290, 420))
-            grav_y_text = self.font.render("Gravity Y: {0:.2f}".format(self.edited_screen.gravity[1]), True, (255, 255, 255), 0)
-            wnd.display.blit(grav_y_text, (1080, 440))
-            wnd.display.blit(dec_text, (1270, 440))
-            wnd.display.blit(inc_text, (1290, 440))
-            jump_frames = self.font.render("Jump strength: {0}".format(self.edited_screen.jump_frames), True, (255, 255, 255), 0)
-            wnd.display.blit(jump_frames, (1080, 460))
-            wnd.display.blit(dec_text, (1270, 460))
-            wnd.display.blit(inc_text, (1290, 460))
-            # lc_text = self.font.render("({0}, {1})".format(self.last_click_x, self.last_click_y), True, (255, 255, 255), 0)
-            # wnd.display.blit(lc_text, (1080, 420))
+            self.font.draw("editor__COMMON__STR", "South transition: {0}".format("solid" if s_tr == 0 else s_tr), 1080, 400, active_color)
+            self.font.draw("editor__COMMON__STR-", "[-]", 1270, 400, active_color)
+            self.font.draw("editor__COMMON__STR+", "[+]", 1290, 400, active_color)
 
-            wscr_id_text = self.font.render("World starting screen: {0}".format(self.edited_world.starting_screen_id), True, (255, 255, 255), 0)
-            wnd.display.blit(wscr_id_text, (1080, 500))
-            use_curr_text = self.font.render("[Use current]", True, (255, 255, 255), 0)
-            wnd.display.blit(use_curr_text, (1080, 520))
+            self.font.draw("editor__COMMON__GRAVX", "Gravity X: {0:.2f}".format(self.edited_screen.gravity[0]), 1080, 420, active_color)
+            self.font.draw("editor__COMMON__GRAVX-", "[-]", 1270, 420, active_color)
+            self.font.draw("editor__COMMON__GRAVX+", "[+]", 1290, 420, active_color)
+            self.font.draw("editor__COMMON__GRAVY", "Gravity Y: {0:.2f}".format(self.edited_screen.gravity[1]), 1080, 440, active_color)
+            self.font.draw("editor__COMMON__GRAVY-", "[-]", 1270, 440, active_color)
+            self.font.draw("editor__COMMON__GRAVY+", "[+]", 1290, 440, active_color)
+            self.font.draw("editor__COMMON__JFRAM", "Jump strength: {0:.2f}".format(self.edited_screen.jump_frames), 1080, 460, active_color)
+            self.font.draw("editor__COMMON__JFRAM-", "[-]", 1270, 460, active_color)
+            self.font.draw("editor__COMMON__JFRAM+", "[+]", 1290, 460, active_color)
+            self.font.draw("editor__COMMON__WSCRID", "World starting screen: {0}".format(self.edited_world.starting_screen_id), 1080, 500, active_color)
+            self.font.draw("editor__COMMON__WSCRUSE", "[Use current]", 1080, 520, active_color)
 
             if self.prompt_message is not None:
-                prompt_1_text = self.font.render(self.prompt_message, True, (0, 255, 0), 0)
-                wnd.display.blit(prompt_1_text, (1300, 500))
+                self.font.draw("editor__PROMPT__MESSAGE", self.prompt_message, 1300, 500, (0, 255, 0, 255))
             if self.prompt_callback is not None:
-                prompt_2_text = self.font.render("RETURN to confirm, BACKSPACE to cancel", True, (255, 255, 255), 0)
-                wnd.display.blit(prompt_2_text, (1300, 520))
+                self.font.draw("editor__PROMPT__CB", "RETURN to confirm, BACKSPACE to cancel", 1300, 520, active_color)
 
             if self.edited_world.starting_screen_id == self.edited_screen.screen_id:
-                select_start_text = self.font.render("[Select start location]", True, (255, 255, 255), 0)
-                wnd.display.blit(select_start_text, (1080, 540))
+                self.font.draw("editor__COMMON__WSCRSTART", "[Select start location]", 1080, 540, active_color)
 
             if self.point_selection_callback is not None:
-                selecting_text = self.font.render("Select point on map (right click to cancel)...", True, (0, 255, 0), 0)
-                wnd.display.blit(selecting_text, (1080, 8))
+                self.font.draw("editor__COMMON__PSEL", "Select point on map (right click to cancel)...", 1080, 8, (0, 255, 0, 255))
 
-            wmus_text = self.font.render("World music: {0}".format(self.edited_world.background_music.audio_name), True, (255, 255, 255), 0)
-            wnd.display.blit(wmus_text, (1080, 560))
-            wnd.display.blit(dec_text, (1400, 560))
-            wnd.display.blit(inc_text, (1420, 560))
+            self.font.draw("editor__COMMON__MUSIC", "World music: {0}".format(self.edited_world.background_music.audio_name), 1080, 560, active_color)
+            self.font.draw("editor__COMMON__MUSIC-", "[-]", 1400, 560, active_color)
+            self.font.draw("editor__COMMON__MUSIC+", "[+]", 1420, 560, active_color)
 
-            wts_text = self.font.render("World tileset ID: {0}".format(self.edited_world.tileset.tileset_id), True, (255, 255, 255), 0)
-            wnd.display.blit(wts_text, (1080, 580))
-            wnd.display.blit(dec_text, (1400, 580))
-            wnd.display.blit(inc_text, (1420, 580))
+            self.font.draw("editor__COMMON__WTSID", "World tileset ID: {0}".format(self.edited_world.tileset.tileset_id), 1080, 580, active_color)
+            self.font.draw("editor__COMMON__WTSID-", "[-]", 1400, 580, active_color)
+            self.font.draw("editor__COMMON__WTSID+", "[+]", 1420, 580, active_color)
 
-            hoitm_text = self.font.render("[Hide objects in terrain modes]", True, active_color if self.hide_objects_in_terrain_modes else passive_color, 0)
-            wnd.display.blit(hoitm_text, (1080, 600))
-
-            self.background.draw_to(160, 120, wnd.display, (1080, 640))
+            self.font.draw("editor__COMMON__HIDEOBJ", "[Hide objects in terrain modes]", 1080, 600, active_color if self.hide_objects_in_terrain_modes else passive_color)
         else:
             if self.editing_mode == EditingMode.SIMULATION or self.editing_mode == EditingMode.FRAMEBYFRAME:
                 self.controller.render_elements(self.screen_seg)

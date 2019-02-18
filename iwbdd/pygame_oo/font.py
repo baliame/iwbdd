@@ -20,6 +20,7 @@ class Font:
         self.text_layer = None
         self.dirty = True
         self.wnd = wnd
+        wnd.add_layer(self)
         self.tex = Texture2D(wnd.w, wnd.h)
 
         self.unit_vbo = VBO(np.array([0, 0, 1, 0, 0, 1, 1, 1], dtype='f'))
@@ -40,9 +41,16 @@ class Font:
         self.dirty = True
         self.draw_directives[draw_id] = (x, y, color, text)
 
-    def clear(self, draw_id):
+    def clear(self, draw_id=None):
+        if draw_id is None and len(self.draw_directives):
+            self.draw_directives = OrderedDict({})
+            self.dirty = True
         if draw_id in self.draw_directives:
             del self.draw_directives[draw_id]
+            self.dirty = True
+
+    def clear_all(self):
+        self.clear()
 
     def render(self, wnd, transparency):
         if self.dirty:

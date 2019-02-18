@@ -330,7 +330,13 @@ class Controller:
             self.player.cached_collision = None
             return
         if self.player.cached_collision[4][0] & COLLISIONTEST_PREVENTS_MOVEMENT:
-            self.player.y -= 1
+            if self.current_screen.has_lens:
+                if (self.player.cached_collision[2][2] > 0 or self.player.cached_collision[2][2] == -1) and (self.player.cached_collision[0][2] > 0 or self.player.cached_collision[0][2] == -1) and (self.player.cached_collision[4][2] > 0):
+                    self.player.y -= self.player.cached_collision[4][3] - self.player.cached_collision[4][2] + 1
+                else:
+                    self.player.die()
+            else:
+                self.player.y -= 1
             self.player.cached_collision = None
             # print("Frame failed: player overlapping solid object")
             return

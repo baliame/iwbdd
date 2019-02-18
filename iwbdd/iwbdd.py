@@ -115,7 +115,7 @@ def editor():
 
     Object.enumerate_objects(Object)
     Boss.enumerate_bosses()
-    w = Window(1600, 768, "IWBDD Editor")
+    w = Window(1600, 768, "IWBDD Editor", viewport_w=1008)
     m.set_window(w)
 
     read_tilesets("tilesets.tls")
@@ -134,10 +134,11 @@ def editor():
         pass
 
     ed = Editor(sys.argv[1], m)
-    m.set_keydown_handler(K_ESCAPE, ml_exit_handler)
+    m.set_keydown_handler(glfw.KEY_ESCAPE, ml_exit_handler)
     m.start()
 
     m.quit()
+
 
 def editor_w2():
     m = MainLoop()

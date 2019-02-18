@@ -25,6 +25,7 @@ class Program:
         self.prog = glCreateProgram()
         self.linked = False
         self.persistent = False
+        self.uniform_locs = {}
 
     def attach(self, shader):
         if self.linked:
@@ -68,7 +69,11 @@ class Program:
                 raise ValueError('Cannot deduce uniform type, call glUniform directly.')
 
     def uniform_loc(self, name):
-        return glGetUniformLocation(self.prog, name)
+        try:
+            return self.uniform_locs[name]
+        except KeyError:
+            self.uniform_locs[name] = glGetUniformLocation(self.prog, name)
+            return self.uniform_locs[name]
 
     def __enter__(self):
         if not (self.persistent and Program.last_use == self):

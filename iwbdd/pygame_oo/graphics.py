@@ -16,6 +16,7 @@ class Graphics:
         self.draw = None
         self.dirty = True
         self.wnd = wnd
+        wnd.add_layer(self)
         self.tex = Texture2D(wnd.w, wnd.h)
 
         self.unit_vbo = VBO(np.array([0, 0, 1, 0, 0, 1, 1, 1], dtype='f'))
@@ -38,6 +39,16 @@ class Graphics:
 
     def _box(self, args):
         self.draw.rectangle((args[0], args[1], args[0] + args[2], args[1] + args[3]), args[5], args[4])
+
+    def polygon(self, draw_id, xy, color=(0, 0, 0, 255), fill=None):
+        if draw_id in self.draw_directives:
+            if self.draw_directives[draw_id] == (self._polygon, (xy, color, fill)):
+                return
+        self.dirty = True
+        self.draw_directives[draw_id] = (self._polygon, (xy, color, fill))
+
+    def _polygon(self, args):
+        self.draw.polygon(args[0], fill=args[2], outline=args[1])
 
     def line(self, draw_id, x0, y0, x1, y1, color=(0, 0, 0, 255)):
         if draw_id in self.draw_directives:

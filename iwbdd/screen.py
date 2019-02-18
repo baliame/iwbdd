@@ -5,6 +5,7 @@ from .tileset import Tileset
 from .common import eofc_read, is_reader_stream, CollisionTest, COLLISIONTEST_PREVENTS_MOVEMENT, SCREEN_SIZE_W, SCREEN_SIZE_H, COLLISIONTEST_COLORS
 from .object_importer import read_object
 from .object import DRAW_PASSES
+from .lens import LensParent, ActivatableLens, MovingLens
 from .pygame_oo.window import Window
 from .pygame_oo.texture import Texture2D
 from .pygame_oo.framebuf import Framebuffer
@@ -116,18 +117,25 @@ class Screen:
         self.all_collisions = Texture2D(dim[0], dim[1], np.zeros(dim[0] * dim[1] * 4, dtype='f'), arr_type=GL_FLOAT, arr_colors=GL_RGBA, dest_colors=GL_RGBA, magf=GL_NEAREST, minf=GL_NEAREST)
         self.terrain_collision_data = b''
         self.all_collision_data = b''
+        self.has_lens = False
 
     def reset_to_initial_state(self):
         self.objects = []
         self.savestate_objects = []
+        self.has_lens = False
         for obj in self.bound_objects:
+            if isinstance(obj, LensParent):
+                self.has_lens = True
             self.objects.append(copy.copy(obj))
             self.savestate_objects.append(copy.copy(obj))
         self.objects_dirty = True
 
     def reset_to_saved_state(self):
         self.objects = []
+        self.has_lens = False
         for obj in self.savestate_objects:
+            if isinstance(obj, LensParent):
+                self.has_lens = True
             self.objects.append(copy.copy(obj))
         self.objects_dirty = True
 
@@ -306,6 +314,9 @@ class Screen:
             self.jump_frames = header[9]
             for i in range(header[10]):
                 obj = read_object(tile_data, self)
+                if isinstance(obj, LensParent):
+                    self.has_lens = True
+                #  print(obj.__class__, isinstance(obj, LensParent), isinstance(obj, ActivatableLens), isinstance(obj, MovingLens))
                 self.bound_objects.append(obj)
                 self.savestate_objects.append(copy.copy(obj))
         else:
@@ -332,9 +343,11 @@ class Screen:
                         tile_idx[Screen.SCREEN_H - (y + 1)][x] = self.world.tileset.stride * ty + tx
                 self.tileids[l1].set_image(tile_idx, GL_UNSIGNED_INT, GL_RED_INTEGER, dest_colors=GL_R32UI, debug=True, noresize=True)
                 self.dirty = False
-        self.background.draw(0, 0, wnd.w, wnd.h)
+        self.background.draw(0, 0, wnd.width(), wnd.height())
         for l2 in LayerDrawOrder:
-            self.world.tileset.draw_full_screen(0, 0, wnd.w, wnd.h, wnd.fbo, self.tileids[int(l2)])
+            if layer is not None and l2 != layer:
+                continue
+            self.world.tileset.draw_full_screen(0, 0, wnd.width(), wnd.height(), wnd.fbo, self.tileids[int(l2)])
 
     def render_objects(self, wnd):
         for i in range(DRAW_PASSES):
@@ -379,8 +392,13 @@ class Screen:
                     if obj.hitbox_type in COLLISIONTEST_COLORS:
                         obj.draw_as_hitbox(Window.instance, COLLISIONTEST_COLORS[obj.hitbox_type])
             self.all_collisions.bindtexunit(0)
-            self.all_collision_data = glGetTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_UNSIGNED_BYTE)
+            self.all_collision_data_static = glGetTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_UNSIGNED_BYTE)
             self.objects_dirty = False
+            self.objects_dynamic_dirty = True
+        if self.objects_dynamic_dirty:
+            self.all_collision_data = self.all_collision_data_static[:]
+            for obj in self.objects:
+                obj.draw_dynamic(self.all_collision_data)
 
     def access_collision(self):
         self.generate_object_collisions()
@@ -483,5 +501,6 @@ class Screen:
         self.all_collisions.screen_render(wnd, 0, 0, wnd.w, wnd.h, fbo, colorize=(1.0, 1.0, 1.0, 0.5))
 
     def tick(self, ctrl):
+        LensParent.coll_check = False
         for obj in self.objects.copy():
             obj.tick(self, ctrl)

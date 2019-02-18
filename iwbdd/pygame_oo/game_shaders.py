@@ -70,7 +70,10 @@ uniform vec4 colorize;
 uniform float tex_idx;
 
 void main() {
-    vec4 spr = texture(sprite, vec3(in_uv, tex_idx));
+    vec4 spr = vec4(0, 0, 0, 0);
+    if (tex_idx >= 0) {
+        vec4 spr = texture(sprite, vec3(in_uv, tex_idx));
+    }
     vec4 scr = texture(screen, in_screen_uv);
 
     spr.a *= colorize.a;
@@ -239,7 +242,7 @@ void main() {
         out_color = vec4(0, 0, 0, 1);
     }
     else {
-        out_color = bg * 0.75 + scr * 0.25;
+        out_color = bg * 0.875 + scr * 0.125;
     }
 }
 
@@ -339,7 +342,7 @@ void main() {
             out_color = vec4(0, 0, 0, 1);
         }
         else {
-            out_color = bg * 0.75 + scr * 0.25;
+            out_color = bg * 0.875 + scr * 0.125;
         }
     }
 }
