@@ -491,14 +491,14 @@ class Screen:
         self.ensure_unscaled_collisions()
         if binding is not None:
             binding.bind()
-        self.terrain_collisions.screen_render(wnd, 0, 0, wnd.w, wnd.h, fbo, colorize=(1.0, 1.0, 1.0, 0.5))
+        self.terrain_collisions.screen_render(wnd, 0, 0, wnd.width(), wnd.height(), fbo, colorize=(1.0, 1.0, 1.0, 0.5))
 
     def render_all_collisions_to_window(self, wnd, fbo):
         binding = Framebuffer.bound
         self.generate_object_collisions()
         if binding is not None:
             binding.bind()
-        self.all_collisions.screen_render(wnd, 0, 0, wnd.w, wnd.h, fbo, colorize=(1.0, 1.0, 1.0, 0.5))
+        self.all_collisions.screen_render(wnd, 0, 0, wnd.width(), wnd.height(), fbo, colorize=(1.0, 1.0, 1.0, 0.5))
 
     def tick(self, ctrl):
         LensParent.coll_check = False

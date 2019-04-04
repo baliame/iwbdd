@@ -105,6 +105,14 @@ def profiled_boss():
     # pr.dump_stats('prof.out')
     pr.print_stats('cumulative')
 
+def profiled_ed():
+    pr = profile.Profile()
+    pr.enable()
+    pr.runcall(editor)
+    #pr.dump_stats('prof.out')
+    pr.print_stats('cumulative')
+
+
 
 def editor():
     m = MainLoop()

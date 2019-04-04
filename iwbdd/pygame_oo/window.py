@@ -1,8 +1,10 @@
 from OpenGL.GL import *
+from OpenGL.arrays.vbo import VBO
+import numpy as np
 import glfw
 from .framebuf import Framebuffer
-from .shader import Mat4
-from .game_shaders import GSH_init
+from .shader import Mat4, Vec4
+from .game_shaders import GSH_init, GSHp
 from .font import Font
 from .graphics import Graphics
 
@@ -44,6 +46,16 @@ class Window:
         glViewport(0, 0, self.w, self.h)
         self.use_game_viewport()
 
+        self.vbo = VBO(np.array([0, 0, 1, 0, 0, 1, 1, 1], dtype='f'))
+        self.vao = glGenVertexArrays(1)
+        glBindVertexArray(self.vao)
+        self.vbo.bind()
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, self.vbo)
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, self.vbo)
+        glEnableVertexAttribArray(0)
+        glEnableVertexAttribArray(1)
+        glBindVertexArray(0)
+
     def update(self):
         pass
 
@@ -70,7 +82,17 @@ class Window:
         if Framebuffer.bound is not None:
             Framebuffer.bound.new_render_pass()
             Framebuffer.bound.bindtexunit(1)
-        prog.uniform('view', self.full_view if self.full else self.view)
+        #prog.uniform('view', self.full_view if self.full else self.view)
+        prog.uniform('view', self.full_view)
+
+    def flood(self, r, g, b, a):
+        with GSHp('GSHP_colorfill') as prog:
+            self.setup_render(prog)
+            prog.uniform('colorize', Vec4(r, g, b, a))
+            prog.uniform('model', Mat4.scaling(self.w, self.h))
+            glBindVertexArray(self.vao)
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
+            glBindVertexArray(0)
 
     def pre_blit(self):
         with self.fbo as fbo:
@@ -80,10 +102,14 @@ class Window:
 
     def __enter__(self):
         self.use_full_viewport()
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        Framebuffer.bound = None
         glClearColor(0.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+        self.flood(0.0, 0.0, 0.0, 1.0)
         self.fbo.new_render_pass(True)
         self.fbo.bind()
+        self.flood(0.0, 0.0, 0.0, 1.0)
         return self
 
     def __exit__(self, *args):

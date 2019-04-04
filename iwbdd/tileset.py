@@ -63,14 +63,21 @@ class Tileset:
         self.unit_arrays = VBO(np.array([0, 0, 1, 0, 0, 1, 1, 1], dtype='f'))
         self.uv_arrays = VBO(np.array([0, 0, 1, 0, 0, 1, 1, 1], dtype='f'))
         self.wh_arrays = VBO(np.array([0, 0, 1, 0, 0, 2, 1, 2], dtype='f'))
-        self.vao = glGenVertexArrays(1)
         self.editor_display = (-1, -1, -1, -1)
         self.editor_display_tileids = None
+        self.vao = glGenVertexArrays(1)
         glBindVertexArray(self.vao)
         self.unit_arrays.bind()
         glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, self.unit_arrays)
         self.uv_arrays.bind()
         glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, self.uv_arrays)
+        glEnableVertexAttribArray(0)
+        glEnableVertexAttribArray(1)
+        glBindVertexArray(0)
+        self.vao2 = glGenVertexArrays(1)
+        glBindVertexArray(self.vao2)
+        self.unit_arrays.bind()
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, self.unit_arrays)
         glEnableVertexAttribArray(0)
         glEnableVertexAttribArray(1)
         glBindVertexArray(0)
@@ -101,6 +108,7 @@ class Tileset:
         bands = img_data.getbands()
         self.tiles_w = round(img_data.width / Tileset.TILE_W)
         self.tiles_h = round(img_data.height / Tileset.TILE_H)
+        self.fulltex = Texture2D(img_data.width, img_data.height, arr=np.frombuffer(img_data.tobytes(), dtype=np.uint8), arr_type=GL_UNSIGNED_BYTE, arr_colors=GL_RGB if len(bands) == 3 else GL_RGBA, dest_colors=GL_RGBA, wrap_x=GL_CLAMP_TO_BORDER, wrap_y=GL_CLAMP_TO_BORDER, border_color=(0, 0, 0, 1))
 
         xf = self.tiles_w
         self.stride = xf
@@ -126,6 +134,26 @@ class Tileset:
             prog.uniform('model', render_loc)
             self.tex.bindtexunit(0)
             glBindVertexArray(self.vao)
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
+            logger.log_draw()
+            glBindVertexArray(0)
+
+    def draw_section(self, x, y, w, h, tx, ty, tw, th):
+        with GSHp("GSHP_blit") as prog:
+            Window.instance.setup_render(prog)
+            utw = 1.0 / self.tiles_w
+            uth = 1.0 / self.tiles_h
+            x0 = tx * utw
+            y0 = ty * uth
+            x1 = x0 + tw * utw
+            y1 = y0 + th * uth
+            tv = VBO(np.array([x0, y0, x1, y0, x0, y1, x1, y1], dtype='f'))
+            prog.uniform('model', Mat4.scaling(w, h, 1).translate(x, y))
+            prog.uniform('colorize', Vec4(1.0, 1.0, 1.0, 1.0))
+            self.fulltex.bindtexunit(1)
+            glBindVertexArray(self.vao2)
+            tv.bind()
+            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, tv)
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
             logger.log_draw()
             glBindVertexArray(0)

@@ -78,12 +78,12 @@ class Background:
         raw_png = eofc_read(reader, data_len)
         img_data = Image.open(BytesIO(raw_png)).transpose(Image.FLIP_TOP_BOTTOM)
         bands = img_data.getbands()
-        self.tex = Texture2D(img_data.width, img_data.height, arr=np.frombuffer(img_data.tobytes(), dtype=np.uint8), arr_type=GL_UNSIGNED_BYTE, arr_colors=GL_RGB if len(bands) == 3 else GL_RGBA, dest_colors=GL_RGBA)
+        self.tex = Texture2D(img_data.width, img_data.height, arr=np.frombuffer(img_data.tobytes(), dtype=np.uint8), arr_type=GL_UNSIGNED_BYTE, arr_colors=GL_RGB if len(bands) == 3 else GL_RGBA, dest_colors=GL_RGBA, wrap_x=GL_REPEAT, wrap_y=GL_REPEAT)
 
     def draw(self, x, y, w, h):
         with GSHp("GSHP_blit") as prog:
             Window.instance.setup_render(prog)
-            prog.uniform('model', Mat4.scaling(w, h, 1))
+            prog.uniform('model', Mat4.scaling(w, h, 1).translate(x, y))
             prog.uniform('colorize', Vec4(1.0, 1.0, 1.0, 1.0))
             self.tex.bindtexunit(1)
             glBindVertexArray(Background.vao)

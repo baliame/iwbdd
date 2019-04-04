@@ -61,7 +61,7 @@ class Framebuffer:
 
     def new_render_pass(self, clear=False):
         if clear:
-            glClearBufferiv(GL_COLOR, 0, np.array([0, 0, 0, 0], dtype='f'))
+            glClearBufferiv(GL_COLOR, 0, np.array([0, 0, 0, 1.0], dtype='f'))
         else:
             self.read_copy()
             logger.log_read_copy(self.fbo_name)

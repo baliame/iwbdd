@@ -26,6 +26,7 @@ setup(
         'console_scripts': [
             'iwbdd=iwbdd.iwbdd:main',
             'iwbdd_prof=iwbdd.iwbdd:profiled',
+            'iwbdd_profed=iwbdd.iwbdd:profiled_ed',
             'iwbdd_tsp=iwbdd.iwbdd:pack_tilesets',
             'iwbdd_bgp=iwbdd.iwbdd:pack_backgrounds',
             'iwbdd_ssp=iwbdd.iwbdd:pack_spritesheets',

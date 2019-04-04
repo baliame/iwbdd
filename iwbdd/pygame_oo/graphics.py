@@ -60,15 +60,18 @@ class Graphics:
     def _line(self, args):
         self.draw.line(args[0:4], args[4])
 
-    def clear(self, draw_id):
-        if draw_id in self.draw_directives:
-            del self.draw_directives[draw_id]
-            self.dirty = True
+    def clear(self, draw_id=None):
+        if draw_id is None:
+            if len(self.draw_directives):
+                self.dirty = True
+                self.draw_directives = OrderedDict({})
+        else:
+            if draw_id in self.draw_directives:
+                del self.draw_directives[draw_id]
+                self.dirty = True
 
     def clear_all(self):
-        if len(self.draw_directives):
-            self.dirty = True
-            self.draw_directives = OrderedDict({})
+        self.clear()
 
     def render(self, wnd, transparency):
         if self.dirty or self.draw is None:
@@ -89,4 +92,3 @@ class Graphics:
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
             logger.log_draw()
             glBindVertexArray(0)
-        self.clear_all()

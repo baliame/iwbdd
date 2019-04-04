@@ -19,7 +19,7 @@ class Texture2D:
     uv_arrays = None
     vao = None
 
-    def __init__(self, w, h, arr=None, arr_type=GL_UNSIGNED_BYTE, arr_colors=GL_RGBA, magf=GL_LINEAR, minf=GL_LINEAR, dest_colors=None, no_init=False, wrap_x=GL_CLAMP_TO_EDGE, wrap_y=GL_CLAMP_TO_EDGE):
+    def __init__(self, w, h, arr=None, arr_type=GL_UNSIGNED_BYTE, arr_colors=GL_RGBA, magf=GL_LINEAR, minf=GL_LINEAR, dest_colors=None, no_init=False, wrap_x=GL_CLAMP_TO_EDGE, wrap_y=GL_CLAMP_TO_EDGE, border_color=None):
         if dest_colors is None:
             dest_colors = arr_colors
         self.texid = glGenTextures(1)
@@ -29,7 +29,7 @@ class Texture2D:
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magf)
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minf)
         if no_init:
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_FLOAT, None)
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_FLOAT, np.zeros([h, w, 4], dtype=np.float))
         else:
             if arr is not None:
                 glTexImage2D(GL_TEXTURE_2D, 0, dest_colors, w, h, 0, arr_colors, arr_type, arr)
@@ -38,6 +38,8 @@ class Texture2D:
         self.w = w
         self.h = h
         self.last_unit = None
+        if border_color is not None:
+            glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, np.array(border_color, dtype='f'))
         if Texture2D.draw_arrays is None:
             Texture2D.draw_arrays = VBO(np.array([0, 0, 1, 0, 0, 1, 1, 1], dtype='f'))
             Texture2D.uv_arrays = VBO(np.array([0, 0, 1, 0, 0, 1, 1, 1], dtype='f'))

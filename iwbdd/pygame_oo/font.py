@@ -15,13 +15,13 @@ class Font:
             self.font = ImageFont.load_default()
         else:
             self.font = ImageFont.truetype(file, size)
-
         self.draw_directives = OrderedDict({})
         self.text_layer = None
         self.dirty = True
         self.wnd = wnd
         wnd.add_layer(self)
         self.tex = Texture2D(wnd.w, wnd.h)
+        self.cache = {}
 
         self.unit_vbo = VBO(np.array([0, 0, 1, 0, 0, 1, 1, 1], dtype='f'))
         self.vao = glGenVertexArrays(1)
