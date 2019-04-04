@@ -174,45 +174,37 @@ class Object:
         pass
 
     @classmethod
-    def render_editor_properties(cls, surf, font, x, y, render_cache):
+    def render_editor_properties(cls, wnd, font, x, y):
         if cls.exclude_from_object_editor:
             raise TypeError('{0} is a hidden object, should not be available in editor.'.format(cls))
         if len(cls.editor_properties) == 0:
-            if Object.no_properties_text is None:
-                Object.no_properties_text = font.render("This object has no configurable attributes.", True, (255, 255, 255), 0)
-            surf.blit(Object.no_properties_text, (x, y))
-            return
+            font.draw("objectREP__NO_PROP", "This object has no configurable attributes.", x, y, color=(255, 255, 255, 255))
         cy = y
         for dest_var, spec in cls.editor_properties.items():
             if spec[0] != EPType.HiddenSelector:
                 dv_render = "obj-dv-{0}".format(dest_var)
-                if dv_render not in render_cache:
-                    render_cache[dv_render] = font.render(dest_var, True, (255, 255, 255))
-                surf.blit(render_cache[dv_render], (x, cy))
+                font.draw("objectREP__PROP__{0}".format(dv_render), dest_var, x, cy, color=(255, 255, 255, 255))
                 if spec[0] == EPType.IntSelector:
                     if dest_var not in cls.editing_values:
                         cls.editing_values[dest_var] = spec[1]
-                    value_text = font.render("{0}".format(cls.editing_values[dest_var]), True, (255, 255, 255), 0)
-                    surf.blit(value_text, (x + 200, cy))
-                    surf.blit(render_cache["dec"], (x + 300, cy))
-                    surf.blit(render_cache["inc"], (x + 320, cy))
+                    font.draw("objectREP__PROP__{0}__VALUE".format(dv_render), "{0}".format(cls.editing_values[dest_var]), x + 200, cy, color=(255, 255, 255, 255))
+                    font.draw("objectREP__PROP__{0}__DEC".format(dv_render), "[-]", x + 300, cy, color=(255, 255, 255, 255))
+                    font.draw("objectREP__PROP__{0}__INC".format(dv_render), "[+]", x + 320, cy, color=(255, 255, 255, 255))
                 elif spec[0] == EPType.PointSelector:
                     if dest_var not in cls.editing_values:
                         cls.editing_values[dest_var] = (0, 0)
-                    value_text = font.render("({0}, {1})".format(cls.editing_values[dest_var][0], cls.editing_values[dest_var][1]), True, (255, 255, 255), 0)
-                    surf.blit(value_text, (x + 200, cy))
-                    surf.blit(render_cache["selectpt"], (x + 300, cy))
-                    surf.blit(render_cache["decx"], (x + 360, cy))
-                    surf.blit(render_cache["incx"], (x + 390, cy))
-                    surf.blit(render_cache["decy"], (x + 420, cy))
-                    surf.blit(render_cache["incy"], (x + 450, cy))
+                    font.draw("objectREP__PROP__{0}__VALUE".format(dv_render), "({0}, {1})".format(cls.editing_values[dest_var][0], cls.editing_values[dest_var][1]), x + 200, cy, color=(255, 255, 255, 255))
+                    font.draw("objectREP__PROP__{0}__PICK".format(dv_render), "[Select]", x + 300, cy, color=(255, 255, 255, 255))
+                    font.draw("objectREP__PROP__{0}__DECX".format(dv_render), "[X-]", x + 360, cy, color=(255, 255, 255, 255))
+                    font.draw("objectREP__PROP__{0}__INCX".format(dv_render), "[X+]", x + 390, cy, color=(255, 255, 255, 255))
+                    font.draw("objectREP__PROP__{0}__DECY".format(dv_render), "[Y-]", x + 420, cy, color=(255, 255, 255, 255))
+                    font.draw("objectREP__PROP__{0}__INCY".format(dv_render), "[Y+]", x + 450, cy, color=(255, 255, 255, 255))
                 elif spec[0] == EPType.FloatSelector:
                     if dest_var not in cls.editing_values:
                         cls.editing_values[dest_var] = spec[1]
-                    value_text = font.render("{0:.4f}".format(cls.editing_values[dest_var]), True, (255, 255, 255), 0)
-                    surf.blit(value_text, (x + 200, cy))
-                    surf.blit(render_cache["dec"], (x + 300, cy))
-                    surf.blit(render_cache["inc"], (x + 320, cy))
+                    font.draw("objectREP__PROP__{0}__VALUE".format(dv_render), "{0:.4f}".format(cls.editing_values[dest_var]), x + 200, cy, color=(255, 255, 255, 255))
+                    font.draw("objectREP__PROP__{0}__DEC".format(dv_render), "[-]", x + 300, cy, color=(255, 255, 255, 255))
+                    font.draw("objectREP__PROP__{0}__INC".format(dv_render), "[+]", x + 320, cy, color=(255, 255, 255, 255))
             cy += 20
 
     @classmethod

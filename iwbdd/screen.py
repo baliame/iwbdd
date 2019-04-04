@@ -356,8 +356,10 @@ class Screen:
                     obj.draw(wnd)
 
     def render_editor_objects(self, wnd):
-        for obj in self.bound_objects:
-            obj.object_editor_draw(wnd)
+        for i in range(DRAW_PASSES):
+            for obj in self.bound_objects:
+                if obj.draw_pass == i:
+                    obj.object_editor_draw(wnd)
 
     def render_objects_hitboxes(self, wnd):
         for obj in self.objects:
