@@ -66,7 +66,7 @@ class Program:
                     logger.log_uniform(name, value, 'int')
                     glUniform1i(loc, value)
             else:
-                raise ValueError('Cannot deduce uniform type, call glUniform directly.')
+                raise ValueError('Cannot deduce uniform type, call glUniform directly. (Original AttributeError: {0})'.format(e))
 
     def uniform_loc(self, name):
         try:
@@ -83,6 +83,64 @@ class Program:
     def __exit__(self, type, value, traceback):
         if not self.persistent:
             glUseProgram(0)
+
+
+class IntArray:
+    def __init__(self, vals, unsigned=False):
+        self.vals = np.array(vals, dtype=np.int32 if not unsigned else np.uint32)
+        self.unsigned = unsigned
+
+    def uniform(self, loc, name):
+        if self.unsigned:
+            logger.log_uniform(name, self.vals, 'unsigned array (x{0})'.format(len(self.vals)))
+            glUniform1uiv(loc, len(self.vals), self.vals)
+        else:
+            logger.log_uniform(name, self.vals, 'int array (x{0})'.format(len(self.vals)))
+            glUniform1iv(loc, len(self.vals), self.vals)
+
+
+class Vec2:
+    def __init__(self, x=0, y=0, dtype='f'):
+        self.data = np.array([x, y], dtype='f')
+        self.dtype = dtype
+
+    def __add__(self, v):
+        return Vec2(self.data[0] + v.data[0], self.data[1] + v.data[1], self.dtype)
+
+    def __iadd__(self, v):
+        self.data = np.array([self.data[0] + v.data[0], self.data[1] + v.data[1]], dtype=self.dtype)
+        return self
+
+    def __mul__(self, v):
+        return self.data[0] * v.data[0] + self.data[1] * v.data[1]
+
+    def uniform(self, loc, name):
+        if self.dtype == 'f' or self.dtype == float or self.dtype == np.float:
+            logger.log_uniform(name, self.data, 'float vector (2)')
+            glUniform2fv(loc, 1, self.data)
+        elif self.dtype == 'U' or self.dtype == np.uint32:
+            logger.log_uniform(name, self.data, 'unsigned vector (2)')
+            glUniform2uiv(loc, 1, self.data)
+        elif self.dtype == 'I' or self.dtype == np.int32:
+            logger.log_uniform(name, self.data, 'int vector (2)')
+            glUniform2iv(loc, 1, self.data)
+
+
+class Vec2Array:
+    def __init__(self, vecs, dtype='f'):
+        self.vecs = np.array([(d.data[0], d.data[1]) for d in vecs], dtype=dtype)
+        self.dtype = dtype
+
+    def uniform(self, loc, name):
+        if self.dtype == 'f' or self.dtype == float or self.dtype == np.float:
+            logger.log_uniform(name, self.vecs, 'float vector (2) array (x{0})'.format(len(self.vecs)))
+            glUniform2fv(loc, len(self.vecs), self.vecs)
+        elif self.dtype == 'U' or self.dtype == np.uint32:
+            logger.log_uniform(name, self.vecs, 'unsigned vector (2) array (x{0})'.format(len(self.vecs)))
+            glUniform2uiv(loc, len(self.vecs), self.vecs)
+        elif self.dtype == 'I' or self.dtype == np.int32:
+            logger.log_uniform(name, self.vecs, 'int vector (2) array (x{0})'.format(len(self.vecs)))
+            glUniform2iv(loc, len(self.vecs), self.vecs)
 
 
 class Vec4:
@@ -158,6 +216,23 @@ class Vec4:
         elif self.dtype == 'I' or self.dtype == np.int32:
             logger.log_uniform(name, self.data, 'int vector')
             glUniform4iv(loc, 1, self.data)
+
+
+class Vec4Array:
+    def __init__(self, vecs, dtype='f'):
+        self.vecs = np.array([(d.data[0], d.data[1], d.data[2], d.data[3]) for d in vecs], dtype=dtype)
+        self.dtype = dtype
+
+    def uniform(self, loc, name):
+        if self.dtype == 'f' or self.dtype == float or self.dtype == np.float:
+            logger.log_uniform(name, self.vecs, 'float vector (4) array (x{0})'.format(len(self.vecs)))
+            glUniform4fv(loc, len(self.vecs), self.vecs)
+        elif self.dtype == 'U' or self.dtype == np.uint32:
+            logger.log_uniform(name, self.vecs, 'unsigned vector (4) array (x{0})'.format(len(self.vecs)))
+            glUniform4uiv(loc, len(self.vecs), self.vecs)
+        elif self.dtype == 'I' or self.dtype == np.int32:
+            logger.log_uniform(name, self.vecs, 'int vector (4) array (x{0})'.format(len(self.vecs)))
+            glUniform4iv(loc, len(self.vecs), self.vecs)
 
 
 class Mat4:
