@@ -12,6 +12,7 @@ from .object import Object
 from .bossfight import Bossfight, Boss
 from . import object_importer
 from .game import Controller
+from .fx import init_fx
 from OpenGL.GL import *
 import glfw
 import time
@@ -76,6 +77,7 @@ def main():
     read_backgrounds("backgrounds.bgs")
     read_spritesheets("spritesheets.sss")
     read_audio("audio.dat")
+    init_fx()
 
     c = Controller(m)
     c.load_world_from_file(sys.argv[1])
@@ -130,6 +132,7 @@ def editor():
     read_backgrounds("backgrounds.bgs")
     read_spritesheets("spritesheets.sss")
     read_audio("audio.dat")
+    init_fx()
 
     try:
         os.mkdir("backups")

@@ -379,6 +379,126 @@ void main() {
 
 """.strip()
 
+GSH_fx_darkroom = """
+#version 430
+
+layout(binding = 1) uniform sampler2D screen;
+
+uniform int   lightSourceOn[10];
+uniform vec4  lightSourceColors[10];
+uniform vec2  lightSourceLocs[10];
+uniform float fullIntensityRadius;
+
+layout(location = 2) in vec2 in_screen_uv;
+layout(location = 3) in vec2 in_screen_pos;
+
+layout(location = 0) out vec4 out_color;
+
+void main() {
+    vec4 scr = texture(screen, in_screen_uv);
+    scr.a = 0;
+
+    for (int i = 0; i < 10; i++) {
+        if (lightSourceOn[i] != 0) {
+            float dx = in_screen_pos.x - lightSourceLocs[i].x;
+            float dy = in_screen_pos.y - lightSourceLocs[i].y;
+            float r2 = dx * dx + dy * dy;
+            float r = sqrt(r2);
+            float rm = lightSourceColors[i].a;
+            float rf = fullIntensityRadius * rm;
+            float rv = rf - r;
+            float ra = rv / rf * 0.5;
+            if (rv >= 0) {
+                scr.rgb = lightSourceColors[i].rgb * ra + scr.rgb * (1 - ra);
+                scr.a = ra + scr.a * (1 - ra);
+            }
+        }
+    }
+    out_color = vec4(scr.rgb * scr.a, 1);
+}
+
+""".strip()
+
+
+GSH_fx_hsv_rotate = """
+#version 430
+
+layout(binding = 1) uniform sampler2D screen;
+
+uniform int t;
+
+layout(location = 2) in vec2 in_screen_uv;
+
+layout(location = 0) out vec4 out_color;
+
+void main() {
+    vec4 scr = texture(screen, in_screen_uv);
+    float h = 0;
+    float s = 0;
+    float v = 0;
+    if (scr.r > scr.g && scr.r > scr.b) {
+        h = 60 * (scr.g - scr.b) / (scr.r - min(scr.g, scr.b));
+        s = (scr.r - min(scr.g, scr.b)) / scr.r;
+        v = scr.r;
+    } else if (scr.g > scr.r && scr.g > scr.b) {
+        h = 60 * (2 + (scr.b - scr.r) / (scr.g - min(scr.r, scr.b)));
+        s = (scr.g - min(scr.r, scr.b)) / scr.g;
+        v = scr.g;
+    } else if (scr.b > scr.r && scr.b > scr.g) {
+        h = 60 * (4 + (scr.r - scr.g) / (scr.b - min(scr.r, scr.g)));
+        s = (scr.b - min(scr.r, scr.g)) / scr.b;
+        v = scr.b;
+    }
+    h += t;
+    while (h < 0) {
+        h += 360;
+    }
+    while (h >= 360) {
+        h -= 360;
+    }
+    float C = s * v;
+    float H2 = h / 60;
+    float X = C * (1 - abs(mod(H2, 2) - 1));
+    vec3 res = vec3(0, 0, 0);
+    if (H2 >= 0 && H2 <= 1) {
+        res = vec3(C, X, 0);
+    } else if (H2 >= 1 && H2 <= 2) {
+        res = vec3(X, C, 0);
+    } else if (H2 >= 2 && H2 <= 3) {
+        res = vec3(0, C, X);
+    } else if (H2 >= 3 && H2 <= 4) {
+        res = vec3(0, X, C);
+    } else if (H2 >= 4 && H2 <= 5) {
+        res = vec3(X, 0, C);
+    } else if (H2 >= 5 && H2 <= 6) {
+        res = vec3(C, 0, X);
+    }
+    float m = v - C;
+    out_color = vec4(res.r + m, res.g + m, res.b + m, 1);
+}
+
+""".strip()
+
+GSH_fx_vertical_sine = """
+#version 430
+
+layout(binding = 1) uniform sampler2D screen;
+
+uniform int t;
+
+layout(location = 2) in vec2 in_screen_uv;
+layout(location = 3) in vec2 in_screen_pos;
+
+
+layout(location = 0) out vec4 out_color;
+
+void main() {
+    float yrad = (in_screen_pos.y + t) / 180 * 3.141592;
+    vec2 distortion = vec2(sin(yrad) * 0.05, 0);
+    out_color = texture(screen, in_screen_uv + distortion);
+}
+""".strip()
+
 
 _GSH_all = [
     (GL_VERTEX_SHADER, "GSH_vtx"),
@@ -394,6 +514,9 @@ _GSH_all = [
     (GL_FRAGMENT_SHADER, "GSH_lens_coll"),
     (GL_FRAGMENT_SHADER, "GSH_lens_semi"),
     (GL_FRAGMENT_SHADER, "GSH_lens_semi_coll"),
+    (GL_FRAGMENT_SHADER, "GSH_fx_darkroom"),
+    (GL_FRAGMENT_SHADER, "GSH_fx_hsv_rotate"),
+    (GL_FRAGMENT_SHADER, "GSH_fx_vertical_sine"),
 ]
 _GSH_progs = {
     "GSHP_render": {GL_VERTEX_SHADER: "GSH_vtx", GL_FRAGMENT_SHADER: "GSH_pix"},
@@ -408,6 +531,9 @@ _GSH_progs = {
     "GSHP_lens_coll": {GL_VERTEX_SHADER: "GSH_vtx", GL_FRAGMENT_SHADER: "GSH_lens_coll"},
     "GSHP_lens_semi": {GL_VERTEX_SHADER: "GSH_vtx", GL_FRAGMENT_SHADER: "GSH_lens_semi"},
     "GSHP_lens_semi_coll": {GL_VERTEX_SHADER: "GSH_vtx", GL_FRAGMENT_SHADER: "GSH_lens_semi_coll"},
+    "GSHP_fx_darkroom": {GL_VERTEX_SHADER: "GSH_vtx", GL_FRAGMENT_SHADER: "GSH_fx_darkroom"},
+    "GSHP_fx_hsv_rotate": {GL_VERTEX_SHADER: "GSH_vtx", GL_FRAGMENT_SHADER: "GSH_fx_hsv_rotate"},
+    "GSHP_fx_vertical_sine": {GL_VERTEX_SHADER: "GSH_vtx", GL_FRAGMENT_SHADER: "GSH_fx_vertical_sine"},
 }
 GSH_compiled = {}
 GSH_programs = {}

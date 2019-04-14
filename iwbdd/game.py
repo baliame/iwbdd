@@ -10,6 +10,9 @@ from .savestate import Savestate
 from pygame import mixer
 import glfw
 from enum import IntEnum
+from .fx import Darkroom
+from .pygame_oo.shader import Vec2, Vec4
+from .pygame_oo.window import Window
 
 
 def bound(v, m0, m1):
@@ -613,6 +616,7 @@ class Controller:
                     self.current_screen.render_all_collisions_to_window(wnd, wnd.fbo)
                     self.player.draw(wnd)
                     self.player.draw_as_hitbox(wnd, (0, 255, 0))
+                self.current_screen.render_fx_pipeline()
                 if self.bossfight and self.bossfight.state >= 2:
                     wnd.graphics.box("boss_health_background", 982 - self.bossfight.boss.initial_health, 23, self.bossfight.boss.initial_health + 2, 26, (0, 0, 0, 255), (0, 0, 0, 255))
                     if self.bossfight.boss.health > 0:
@@ -642,3 +646,12 @@ class Controller:
                     self.current_world.screens[transition].tick(self)
                     trd.append(transition)
         self.simulate()
+        di = Darkroom.instance
+        di.reset()
+        di.set_light_source(0, Vec2(self.player.x, Window.instance.h - self.player.y), Vec4(1.0, 0.4, 0.02, 1.0))
+        i = 1
+        for b in self.player.bullets:
+            if i >= 10:
+                break
+            di.set_light_source(i, Vec2(b.x, Window.instance.h - b.y), Vec4(0.2, 1.0, 0.2, 0.5))
+            i += 1

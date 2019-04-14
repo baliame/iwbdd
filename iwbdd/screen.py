@@ -13,6 +13,7 @@ import copy
 from OpenGL.GL import *
 import numpy as np
 from PIL import Image
+from .fx import Darkroom, HSV_Rotator, Vertical_Sine_Distortion
 
 
 class Collision(IntEnum):
@@ -118,6 +119,7 @@ class Screen:
         self.terrain_collision_data = b''
         self.all_collision_data = b''
         self.has_lens = False
+        self.fx_pipeline = []
 
     def reset_to_initial_state(self):
         self.objects = []
@@ -401,6 +403,10 @@ class Screen:
             self.all_collision_data = self.all_collision_data_static[:]
             for obj in self.objects:
                 obj.draw_dynamic(self.all_collision_data)
+
+    def render_fx_pipeline(self):
+        for fx in self.fx_pipeline:
+            fx.apply()
 
     def access_collision(self):
         self.generate_object_collisions()
