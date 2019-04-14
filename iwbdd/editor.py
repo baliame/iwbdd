@@ -511,8 +511,8 @@ class Editor:
                 self.font.draw("editor__COMMON__HIDEOBJ", "[Hide objects in terrain modes]", 1080, 600, active_color if self.hide_objects_in_terrain_modes else passive_color)
         else:
             if self.editing_mode == EditingMode.SIMULATION or self.editing_mode == EditingMode.FRAMEBYFRAME:
-                self.controller.render_elements(self.screen_seg)
-                wnd.display.blit(self.render_cache["rac-active"] if self.controller.render_collisions else self.render_cache["rac-passive"], (Editor.ts_display_x, Editor.ts_display_y))
+                self.font.draw("editor__SIM_ASCOLL", "[Render as collisions]", Editor.ts_display_x, Editor.ts_display_y, active_color if self.controller.render_collisions else passive_color)
+                self.controller.render_elements(wnd)
 
     def sm_to_clipboard(self):
         self.sm_clipboard = [[(0, 0, 0) for x in range(self.sm_selection_1[0], self.sm_selection_2[0] + 1)] for y in range(self.sm_selection_1[1], self.sm_selection_2[1] + 1)]

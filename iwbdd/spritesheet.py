@@ -107,10 +107,11 @@ class Spritesheet:
         with self.tex as t:
             idx = 0
             for y in range(yf):
-                sy = img_data.height - y * self.cell_h
+                sy = img_data.height - (y + 1) * self.cell_h
                 for x in range(xf):
                     sx = x * self.cell_w
-                    img = img_data.crop((sx, sy - self.cell_h, sx + self.cell_w, sy))
+                    img = img_data.crop((sx, sy, sx + self.cell_w, sy + self.cell_h))
+                    # print(img.tobytes())
                     t.set_image(idx, np.frombuffer(img.tobytes(), dtype=np.uint8), data_type=GL_UNSIGNED_BYTE, data_colors=GL_RGB if len(bands) == 3 else GL_RGBA)
                     idx += 1
         # self.variants[(None, 255, 1)] = self.image_surface
@@ -120,12 +121,12 @@ class Spritesheet:
         with GSHp('GSHP_render_sheet') as prog:
             render_loc = self.model * Mat4.translation(draw_x, Window.instance.h - draw_y)
             self.vec_buf.load_rgb_a(self.variant_color, self.variant_alpha)
-            tex_idx = float(x + self.stride * y)
+            tex_idx = int(x) + self.stride * int(y)
 
             Window.instance.setup_render(prog)
 
             prog.uniform('colorize', self.vec_buf)
-            prog.uniform('tex_idx', tex_idx)
+            prog.uniform('tex_idx', tex_idx, unsigned=True)
             prog.uniform('model', render_loc)
 
             self.tex.bindtexunit(0)
@@ -140,12 +141,12 @@ class Spritesheet:
         with GSHp('GSHP_render_sheet') as prog:
             render_loc = Mat4.scaling(w, h).translate(draw_x, Window.instance.h - draw_y)
             self.vec_buf.load_rgb_a(self.variant_color, self.variant_alpha)
-            tex_idx = float(x + self.stride * y)
+            tex_idx = int(x) + self.stride * int(y)
 
             Window.instance.setup_render(prog)
 
             prog.uniform('colorize', self.vec_buf)
-            prog.uniform('tex_idx', tex_idx)
+            prog.uniform('tex_idx', tex_idx, unsigned=True)
             prog.uniform('model', render_loc)
 
             self.tex.bindtexunit(0)
