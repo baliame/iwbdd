@@ -129,8 +129,8 @@ class Tileset:
             Window.instance.setup_render(prog)
             render_loc = self.model * Mat4.scaling(Tileset.TILE_W if w is None else w, Tileset.TILE_H if h is None else h).translate(draw_x, draw_y)
             prog.uniform('colorize', self.vec_buf)
-            tex_idx = float(x + self.stride * y)
-            prog.uniform('tex_idx', tex_idx)
+            tex_idx = x + self.stride * y
+            prog.uniform('tex_idx', tex_idx, unsigned=True)
             prog.uniform('model', render_loc)
             self.tex.bindtexunit(0)
             glBindVertexArray(self.vao)
@@ -144,9 +144,9 @@ class Tileset:
             utw = 1.0 / self.tiles_w
             uth = 1.0 / self.tiles_h
             x0 = tx * utw
-            y0 = ty * uth
+            y1 = 1.0 - ty * uth
             x1 = x0 + tw * utw
-            y1 = y0 + th * uth
+            y0 = y1 - th * uth
             tv = VBO(np.array([x0, y0, x1, y0, x0, y1, x1, y1], dtype='f'))
             prog.uniform('model', Mat4.scaling(w, h, 1).translate(x, y))
             prog.uniform('colorize', Vec4(1.0, 1.0, 1.0, 1.0))

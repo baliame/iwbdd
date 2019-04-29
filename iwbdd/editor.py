@@ -12,6 +12,7 @@ from .audio_data import Audio
 from .bossfight import Boss
 from enum import IntEnum
 import glfw
+from .fx import FX
 from OpenGL.GL import *
 
 
@@ -29,9 +30,10 @@ class EditingMode(IntEnum):
     OBJECTS = 3
     OBJECT_LIST = 4
     BOSS = 5
-    MODE_SWITCH_ROLLOVER = 6
-    SIMULATION = 6
-    FRAMEBYFRAME = 7
+    FX = 6
+    MODE_SWITCH_ROLLOVER = 7
+    SIMULATION = 7
+    FRAMEBYFRAME = 8
 
 
 EditingModeLock = (EditingMode.SIMULATION, EditingMode.FRAMEBYFRAME)
@@ -41,6 +43,7 @@ LayerLabels = OrderedDict({
     Layer.FOREGROUND: "FG ",
     Layer.BACKGROUND_1: "BG1",
     Layer.BACKGROUND_2: "BG2",
+    Layer.SUPERFOREGROUND: "FG2",
 })
 
 
@@ -170,6 +173,8 @@ class Editor:
 
         self.objed_selection = None if Object.object_editor_items is None else Object.object_editor_items[0]
         self.objlist_selection_idx = None
+
+        self.fx_selection = 0
 
         try:
             fh = open(world_file, 'rb')
@@ -331,9 +336,10 @@ class Editor:
         self.font.draw("editor__MODE__OBJECTS", "Objects", 1500, 380, color=active_color if self.editing_mode == EditingMode.OBJECTS else passive_color)
         self.font.draw("editor__MODE__OBJECT_LIST", "Object List", 1500, 400, color=active_color if self.editing_mode == EditingMode.OBJECT_LIST else passive_color)
         self.font.draw("editor__MODE__BOSS", "Boss", 1500, 420, color=active_color if self.editing_mode == EditingMode.BOSS else passive_color)
-        self.graphics.line("editor__MODE__SEPARATOR", 1500, 436, 1580, 436, color=passive_color)
-        self.font.draw("editor__MODE__SIMULATION", "Simulation", 1500, 440, color=active_color if self.editing_mode == EditingMode.SIMULATION else passive_color)
-        self.font.draw("editor__MODE__FRAMEBYFRAME", "Frame-by-frame", 1500, 460, color=active_color if self.editing_mode == EditingMode.FRAMEBYFRAME else passive_color)
+        self.font.draw("editor__MODE__FX", "FX", 1500, 440, color=active_color if self.editing_mode == EditingMode.FX else passive_color)
+        self.graphics.line("editor__MODE__SEPARATOR", 1500, 456, 1580, 456, color=passive_color)
+        self.font.draw("editor__MODE__SIMULATION", "Simulation", 1500, 460, color=active_color if self.editing_mode == EditingMode.SIMULATION else passive_color)
+        self.font.draw("editor__MODE__FRAMEBYFRAME", "Frame-by-frame", 1500, 480, color=active_color if self.editing_mode == EditingMode.FRAMEBYFRAME else passive_color)
         self.font.draw("editor__SAVE", "[Save now]", 1500, 728, color=active_color)
 
         fps = self.main_loop.fps()
@@ -362,10 +368,13 @@ class Editor:
 
                 if self.editing_mode == EditingMode.TERRAIN:
                     self.tileset.draw_section(Editor.ts_display_x, 768 - Editor.ts_display_y - Editor.ts_view_h * Tileset.TILE_H, Editor.ts_view_w * Tileset.TILE_W, Editor.ts_view_h * Tileset.TILE_H, self.ts_view_x, self.ts_view_y, Editor.ts_view_w, Editor.ts_view_h)
-                    #tileids = self.tileset.set_editor_display(self.ts_view_x, self.ts_view_y, Editor.ts_view_w, Editor.ts_view_h)
-                    #self.tileset.draw_full_screen(Editor.ts_display_x, Editor.ts_display_y, Editor.ts_view_w * Tileset.TILE_W, Editor.ts_view_h * Tileset.TILE_H, wnd.fbo, tileids)
 
                     self.graphics.box("editor__TERRAIN__TILESETBOX", Editor.ts_display_x - 1, Editor.ts_display_y - 1, Editor.ts_view_w * Tileset.TILE_W + 2, Editor.ts_view_h * Tileset.TILE_H + 2, color=active_color)
+                    self.graphics.polygon("editor__TERRAIN__POLY1", [(Editor.ts_display_x - Tileset.TILE_W - 1, (Editor.ts_view_h / 2) * Tileset.TILE_H + Editor.ts_display_y), (Editor.ts_display_x - 5, (Editor.ts_view_h / 2 - 2) * Tileset.TILE_H + Editor.ts_display_y), (Editor.ts_display_x - 5, (Editor.ts_view_h / 2 + 2) * Tileset.TILE_H + Editor.ts_display_y)], color=(255, 255, 255, 255))
+                    self.graphics.polygon("editor__TERRAIN__POLY2", [(Editor.ts_display_x + Editor.ts_view_w * Tileset.TILE_W + Tileset.TILE_W + 1, (Editor.ts_view_h / 2) * Tileset.TILE_H + Editor.ts_display_y), (Editor.ts_display_x + Editor.ts_view_w * Tileset.TILE_W + 5, (Editor.ts_view_h / 2 - 2) * Tileset.TILE_H + Editor.ts_display_y), (Editor.ts_display_x + Editor.ts_view_w * Tileset.TILE_W + 5, (Editor.ts_view_h / 2 + 2) * Tileset.TILE_H + Editor.ts_display_y)], color=(255, 255, 255, 255))
+                    self.graphics.polygon("editor__TERRAIN__POLY3", [(Editor.ts_display_x + Tileset.TILE_W * 2, Editor.ts_display_y - Tileset.TILE_H - 1), (Editor.ts_display_x, Editor.ts_display_y - 5), (Editor.ts_display_x + Tileset.TILE_W * 4, Editor.ts_display_y - 5)], color=(255, 255, 255, 255))
+                    self.graphics.polygon("editor__TERRAIN__POLY4", [(Editor.ts_display_x + Editor.ts_view_w * Tileset.TILE_W - Tileset.TILE_W * 2, Editor.ts_display_y + Editor.ts_view_h * Tileset.TILE_H + Tileset.TILE_H + 1), (Editor.ts_display_x + Editor.ts_view_w * Tileset.TILE_W, Editor.ts_display_y + Editor.ts_view_h * Tileset.TILE_H + 5), (Editor.ts_display_x + Editor.ts_view_w * Tileset.TILE_W - Tileset.TILE_W * 4, Editor.ts_display_y + Editor.ts_view_h * Tileset.TILE_H + 5)], color=(255, 255, 255, 255))
+                    # self.graphics.polygon("editor__TERRAIN__POLY2", [(Editor.ts_display_x + 120, Editor.ts_display_y + 84), (Editor.ts_display_x + 104, Editor.ts_display_y + 76), (Editor.ts_display_x + 104, Editor.ts_display_y + 92)], color=(255, 255, 255, 255))
                     if self.ts_select_x >= self.ts_view_x and self.ts_select_y >= self.ts_view_y and self.ts_select_x < self.ts_view_x + Editor.ts_view_w and self.ts_select_y < self.ts_view_y + Editor.ts_view_h:
                         tile_id_x = self.ts_select_x - self.ts_view_x
                         tile_id_y = self.ts_select_y - self.ts_view_y
@@ -377,7 +386,7 @@ class Editor:
                         c_x += 50
                     self.font.draw("editor__LAYER__HIDE", "[Hide other layers]", c_x, b_y, color=active_color if self.only_render_current_layer else passive_color)
                 elif self.editing_mode == EditingMode.COLLISION:
-                    Tileset.collision_tileset.draw_to(self.collision_editor, 0, Editor.tslx, Editor.tsby, w=70, h=70)
+                    Tileset.collision_tileset.draw_to(self.collision_editor, 0, Editor.tslx, wnd.height() - Editor.tsby, w=70, h=70)
 
                     self.font.draw("editor__COLL__NONE", "NONE", Editor.ts_display_x, Editor.ts_display_y, (255, 255, 255, 255))
                     self.font.draw("editor__COLL__SOLID", "SOLID", Editor.ts_display_x, Editor.ts_display_y + 16, (0, 0, 255, 255))
@@ -401,7 +410,9 @@ class Editor:
                     self.font.draw("editor__SELECT__CUT", "[Cut] (X)", Editor.ts_display_x, Editor.ts_display_y + 20, color=active_color if has_selection else passive_color)
                     self.font.draw("editor__SELECT__COPY", "[Copy] (C)", Editor.ts_display_x, Editor.ts_display_y + 40, color=active_color if has_selection else passive_color)
                     self.font.draw("editor__SELECT__FILLT", "[Fill with Terrain] (I)", Editor.ts_display_x, Editor.ts_display_y + 60, color=active_color if has_selection else passive_color)
+                    self.tileset.draw_to(self.ts_select_x - self.ts_view_x, self.ts_select_y - self.ts_view_y, Editor.ts_display_x + 300, wnd.height() - (Editor.ts_display_y + 80), w=20, h=20)
                     self.font.draw("editor__SELECT__FILLC", "[Fill with Collision] (O)", Editor.ts_display_x, Editor.ts_display_y + 80, color=active_color if has_selection else passive_color)
+                    Tileset.collision_tileset.draw_to(self.collision_editor, 0, Editor.ts_display_x + 300, wnd.height() - (Editor.ts_display_y + 100), w=20, h=20)
                     self.font.draw("editor__SELECT__RESETT", "[Reset Terrain]", Editor.ts_display_x, Editor.ts_display_y + 100, color=active_color if has_selection else passive_color)
                     self.font.draw("editor__SELECT__RESETC", "[Reset Collision]", Editor.ts_display_x, Editor.ts_display_y + 120, color=active_color if has_selection else passive_color)
                     self.font.draw("editor__SELECT__PASTE", "[Paste] (V)", Editor.ts_display_x, Editor.ts_display_y + 140, color=active_color if has_selection and self.sm_clipboard is not None else passive_color)
@@ -458,6 +469,29 @@ class Editor:
                         self.font.draw("editor__BOSS__COORD_INCY", "[Y+]", Editor.ts_display_x + 90, Editor.ts_display_y + 60, color=active_color)
                         self.font.draw("editor__BOSS__COORD_SEL", "[Select]", Editor.ts_display_x + 120, Editor.ts_display_y + 60, color=active_color)
                         self.graphics.box("editor__BOSS__OUTINE", self.edited_world.bossfight_spec[2], self.edited_world.bossfight_spec[3], 72, 72, color=(255, 255, 0, 255))
+                elif self.editing_mode == EditingMode.FX:
+                    self.font.draw("editor__FX__PIPELINE", "FX Pipeline:", Editor.ts_display_x, Editor.ts_display_y, (255, 255, 255, 255))
+                    if len(self.edited_screen.fx_pipeline) == 0:
+                        self.font.draw("editor__FX__PIPELINE_EMPTY", "<empty>", Editor.ts_display_x, Editor.ts_display_y + 20, (255, 0, 0, 255))
+                    else:
+                        for i in range(len(self.edited_screen.fx_pipeline)):
+                            self.font.draw("editor__FX__PIPELINE_{0}".format(i), self.edited_screen.fx_pipeline[i].label, Editor.ts_display_x, Editor.ts_display_y + 20 * (i + 1), (255, 255, 255, 255))
+                            self.font.draw("editor__FX__PIPELINE_{0}_DEL".format(i), "[X]", Editor.ts_display_x + 350, Editor.ts_display_y + 20 * (i + 1), (255, 255, 255, 255))
+                            if i > 0:
+                                self.font.draw("editor__FX__PIPELINE_{0}_UP".format(i), "[^]", Editor.ts_display_x + 380, Editor.ts_display_y + 20 * (i + 1), (255, 255, 255, 255))
+                            if i < len(self.edited_screen.fx_pipeline) - 1:
+                                self.font.draw("editor__FX__PIPELINE_{0}_DOWN".format(i), "[v]", Editor.ts_display_x + 410, Editor.ts_display_y + 20 * (i + 1), (255, 255, 255, 255))
+                    self.font.draw("editor__FX__PIPELINE_NEW", "Add new FX:", Editor.ts_display_x, Editor.ts_display_y + 220, (255, 255, 255, 255))
+                    if len(self.edited_screen.fx_pipeline) < 10:
+                        sel_fx_id = list(FX.ApplicableFXes)[self.fx_selection]
+                        sel_fx = FX.ApplicableFXes[sel_fx_id]
+                        self.font.draw("editor__FX__PIPELINE_CURR", sel_fx.label, Editor.ts_display_x, Editor.ts_display_y + 240, (255, 255, 255, 255))
+                        self.font.draw("editor__FX__PIPELINE_ADD", "[+]", Editor.ts_display_x + 350, Editor.ts_display_y + 240, (255, 255, 255, 255))
+                        self.font.draw("editor__FX__PIPELINE_PREV", "[<]", Editor.ts_display_x + 380, Editor.ts_display_y + 240, (255, 255, 255, 255))
+                        self.font.draw("editor__FX__PIPELINE_NEXT", "[>]", Editor.ts_display_x + 410, Editor.ts_display_y + 240, (255, 255, 255, 255))
+                    else:
+                        self.font.draw("editor__FX__PIPELINE_FULL", "<FX pipeline is full>", Editor.ts_display_x, Editor.ts_display_y + 240, (255, 0, 0, 255))
+
 
                 self.font.draw("editor__COMMON__SCRID", "Screen id: {0}".format(self.edited_screen.screen_id), 1080, 320, active_color)
                 e_tr = self.edited_screen.transitions[0]
@@ -621,7 +655,11 @@ class Editor:
                     self.exit_simulation_if_needed()
                     self.change_mode(EditingMode.BOSS)
                     return
-                elif event.pos[1] < 460:
+                elif event.pos[1] < 456:
+                    self.exit_simulation_if_needed()
+                    self.change_mode(EditingMode.FX)
+                    return
+                elif event.pos[1] < 480:
                     if self.editing_mode not in SimulationModes:
                         self.exit_simulation_if_needed()
                         self.change_mode(EditingMode.SIMULATION)
@@ -630,7 +668,7 @@ class Editor:
                         self.change_mode(EditingMode.SIMULATION)
                         self.main_loop.suspend_ticking = False
                     return
-                elif event.pos[1] < 480:
+                elif event.pos[1] < 500:
                     if self.editing_mode not in SimulationModes:
                         self.exit_simulation_if_needed()
                         self.change_mode(EditingMode.FRAMEBYFRAME)
@@ -655,6 +693,16 @@ class Editor:
                         if tx < self.tileset.tiles_w and ty < self.tileset.tiles_h:
                             self.ts_select_x = tx
                             self.ts_select_y = ty
+                    elif mousebox(event.pos[0], event.pos[1], Editor.ts_display_x, Editor.ts_display_y - Tileset.TILE_H - 1, Tileset.TILE_W * 4, Tileset.TILE_H - 5):
+                        if self.ts_view_y > 0:
+                            self.ts_view_y -= 1
+                    elif mousebox(event.pos[0], event.pos[1], Editor.ts_display_x + (Editor.ts_view_w - 4) * Tileset.TILE_W, Editor.ts_display_y + Editor.ts_view_h * Tileset.TILE_H + 5, Tileset.TILE_W * 4, Tileset.TILE_H - 5):
+                        self.ts_view_y += 1
+                    elif mousebox(event.pos[0], event.pos[1], Editor.ts_display_x - Tileset.TILE_W - 1, Editor.ts_display_y + (Editor.ts_view_h / 2 - 2) * Tileset.TILE_H, Tileset.TILE_W - 5, Tileset.TILE_H * 4):
+                        if self.ts_view_x > 0:
+                            self.ts_view_x -= 1
+                    elif mousebox(event.pos[0], event.pos[1], Editor.ts_display_x + Editor.ts_view_w * Tileset.TILE_W + 5, (Editor.ts_view_h / 2 - 2) * Tileset.TILE_H + Editor.ts_display_y, Tileset.TILE_W - 5, Tileset.TILE_H * 4):
+                        self.ts_view_x += 1
                     elif mousebox(event.pos[0], event.pos[1], c_x, b_y, (len(LayerLabels) + 4) * 50, 20):
                         for layer, label in LayerLabels.items():
                             if event.pos[0] < c_x + 50:
@@ -796,6 +844,43 @@ class Editor:
                                 elif event.pos[0] < dx + 220:
                                     self.locked[1] = True
                                     self.point_selection_callback = self.set_bossfight_coords
+                elif self.editing_mode == EditingMode.FX and not self.locked[1]:
+                    if len(self.edited_screen.fx_pipeline) < 10:
+                        if mousebox(event.pos[0], event.pos[1], Editor.ts_display_x + 350, Editor.ts_display_y + 240, 30, 20):
+                            sel_fx_id = list(FX.ApplicableFXes)[self.fx_selection]
+                            sel_fx = FX.ApplicableFXes[sel_fx_id]
+                            self.edited_screen.fx_pipeline.append(sel_fx)
+                            self.locked[1] = True
+                            return
+                        elif mousebox(event.pos[0], event.pos[1], Editor.ts_display_x + 380, Editor.ts_display_y + 240, 30, 20):
+                            self.fx_selection -= 1
+                            if self.fx_selection < 0:
+                                self.fx_selection = len(list(FX.ApplicableFXes)) - 1
+                            self.locked[1] = True
+                            return
+                        elif mousebox(event.pos[0], event.pos[1], Editor.ts_display_x + 410, Editor.ts_display_y + 240, 30, 20):
+                            self.fx_selection += 1
+                            if self.fx_selection >= len(list(FX.ApplicableFXes)):
+                                self.fx_selection = 0
+                            self.locked[1] = True
+                            return
+                    for i in range(len(self.edited_screen.fx_pipeline)):
+                        if mousebox(event.pos[0], event.pos[1], Editor.ts_display_x + 350, Editor.ts_display_y + 20 * (i + 1), 30, 20):
+                            self.locked[1] = True
+                            del self.edited_screen.fx_pipeline[i]
+                            return
+                        elif i > 0 and mousebox(event.pos[0], event.pos[1], Editor.ts_display_x + 380, Editor.ts_display_y + 20 * (i + 1), 30, 20):
+                            self.locked[1] = True
+                            swap = self.edited_screen.fx_pipeline[i]
+                            self.edited_screen.fx_pipeline[i] = self.edited_screen.fx_pipeline[i - 1]
+                            self.edited_screen.fx_pipeline[i - 1] = swap
+                            return
+                        elif i < len(self.edited_screen.fx_pipeline) - 1 and mousebox(event.pos[0], event.pos[1], Editor.ts_display_x + 410, Editor.ts_display_y + 20 * (i + 1), 30, 20):
+                            self.locked[1] = True
+                            swap = self.edited_screen.fx_pipeline[i]
+                            self.edited_screen.fx_pipeline[i] = self.edited_screen.fx_pipeline[i - 1]
+                            self.edited_screen.fx_pipeline[i - 1] = swap
+                            return
                 if not self.locked[1]:
                     if mousebox(event.pos[0], event.pos[1], 1500, 728, 100, 20):
                         self.locked[1] = True
@@ -878,8 +963,8 @@ class Editor:
                     self.point_selection_callback = None
                     self.locked[1] = True
                     return
-                sctx = int(event.pos[0] / Tileset.TILE_W)
-                scty = int(event.pos[1] / Tileset.TILE_H)
+                sctx = max(min(int(event.pos[0] / Tileset.TILE_W), Screen.SCREEN_W - 1), 0)
+                scty = max(min(int(event.pos[1] / Tileset.TILE_H), Screen.SCREEN_H - 1), 0)
                 if self.editing_mode == EditingMode.SELECTION:
                     if event.button == 3:
                         self.sm_selection_1 = None
@@ -893,10 +978,10 @@ class Editor:
                             self.sm_selection_1 = (sctx, scty)
                             self.sm_selection_2 = (sctx, scty)
                         else:
-                            xmin = min(sctx, self.sm_base_point[0])
-                            xmax = max(sctx, self.sm_base_point[0])
-                            ymin = min(scty, self.sm_base_point[1])
-                            ymax = max(scty, self.sm_base_point[1])
+                            xmin = max(min(sctx, self.sm_base_point[0]), 0)
+                            xmax = min(max(sctx, self.sm_base_point[0]), Screen.SCREEN_W - 1)
+                            ymin = max(min(scty, self.sm_base_point[1]), 0)
+                            ymax = min(max(scty, self.sm_base_point[1]), Screen.SCREEN_H - 1)
                             self.sm_selection_1 = (xmin, ymin)
                             self.sm_selection_2 = (xmax, ymax)
                 elif self.editing_mode == EditingMode.TERRAIN:
@@ -913,7 +998,7 @@ class Editor:
                     self.edited_screen.dirty_collisions = True
                 elif self.editing_mode == EditingMode.OBJECTS:
                     if not self.locked[1]:
-                        self.edited_screen.bound_objects.append(self.objed_selection(self.edited_screen, event.pos[0], event.pos[1], self.objed_selection.editing_values))
+                        self.edited_screen.bound_objects.append(self.objed_selection(self.edited_screen, int(event.pos[0]), int(event.pos[1]), self.objed_selection.editing_values))
                         self.edited_screen.reset_to_initial_state()
         else:
             if self.editing_mode == EditingMode.SIMULATION or self.editing_mode == EditingMode.FRAMEBYFRAME and not self.locked[0]:
@@ -922,14 +1007,14 @@ class Editor:
                     self.locked[1] = True
 
     def set_start_coordinates(self, x, y):
-        self.edited_world.start_x = x
-        self.edited_world.start_y = y
+        self.edited_world.start_x = int(x)
+        self.edited_world.start_y = int(y)
         self.controller.reset_from_editor(self)
 
     def move_selected_object(self, x, y):
         ed_obj = self.edited_screen.bound_objects[self.objlist_selection_idx]
-        ed_obj.x = x
-        ed_obj.y = y
+        ed_obj.x = int(x)
+        ed_obj.y = int(y)
         self.edited_screen.reset_to_initial_state()
 
     def dec_transition(self, idx):

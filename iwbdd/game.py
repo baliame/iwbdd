@@ -30,6 +30,8 @@ class Controls(IntEnum):
     SHOOT = 3
     RESET = 4
     SKIP = 5
+    LOOK_UP = 6
+    LOOK_DOWN = 7
     DEV1 = 16
     DEV2 = 17
 
@@ -65,6 +67,8 @@ class Controller:
     default_keybindings = {
         Controls.LEFT: glfw.KEY_LEFT,
         Controls.RIGHT: glfw.KEY_RIGHT,
+        Controls.LOOK_UP: glfw.KEY_UP,
+        Controls.LOOK_DOWN: glfw.KEY_DOWN,
         Controls.JUMP: glfw.KEY_SPACE,
         Controls.SHOOT: glfw.KEY_A,
         Controls.RESET: glfw.KEY_R,
@@ -435,6 +439,12 @@ class Controller:
                 change_facing = 0
             else:
                 change_facing = 1
+        looking = 0
+        if keys[self.keybindings[Controls.LOOK_UP]]:
+            looking += 1
+        if keys[self.keybindings[Controls.LOOK_DOWN]]:
+            looking -= 1
+        self.player.looking = looking
         if keys[self.keybindings[Controls.JUMP]]:
             if not self.player.jump_held and not self.player.doublejump_blocked:
                 self.player.jump_held = True
@@ -490,14 +500,18 @@ class Controller:
             if change_facing < 0:
                 if self.player.state != "moving_left":
                     self.player.state = "moving_left"
+                self.player.facing = -1
             else:
                 if self.player.state != "moving_right":
                     self.player.state = "moving_right"
+                self.player.facing = 1
         elif self.player.state != "stop_left" and self.player.state != "stop_right":
             if self.player.state == "moving_left":
                 self.player.state = "stop_left"
+                self.player.facing = -1
             else:
                 self.player.state = "stop_right"
+                self.player.facing = 1
 
         sumv = (gv[0] + mvx + conveyor_velocity[0], gv[1] + mvy + conveyor_velocity[1])
         dest = [self.player.x + sumv[0], self.player.y + sumv[1]]
@@ -646,12 +660,5 @@ class Controller:
                     self.current_world.screens[transition].tick(self)
                     trd.append(transition)
         self.simulate()
-        di = Darkroom.instance
-        di.reset()
-        di.set_light_source(0, Vec2(self.player.x, Window.instance.h - self.player.y), Vec4(1.0, 0.4, 0.02, 1.0))
-        i = 1
-        for b in self.player.bullets:
-            if i >= 10:
-                break
-            di.set_light_source(i, Vec2(b.x, Window.instance.h - b.y), Vec4(0.2, 1.0, 0.2, 0.5))
-            i += 1
+        for item in self.current_screen.fx_pipeline:
+            item.update(self)

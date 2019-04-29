@@ -50,6 +50,7 @@ class Player(Object):
             "extra_doublejumps": dja
         }
         self._state = "stop_right"
+        self.facing = 1
         self.hitbox_w = 16
         self.hitbox_h = 8
         self.bottom_pixel = self.hitbox_h - 1
@@ -59,6 +60,7 @@ class Player(Object):
         self.bullets = []
         self.controller = ctrl
         self.save_state = None
+        self.looking = 0
 
     def create_save_state(self):
         self.save_state = Player(None)
@@ -89,6 +91,10 @@ class Player(Object):
         self.save_state._state = eofc_read(f, sl).decode('ascii')
         self.save_state.x = struct.unpack('<d', eofc_read(f, 8))[0]
         self.save_state.y = struct.unpack('<d', eofc_read(f, 8))[0]
+        if self.save_state._state == "moving_left" or self.save_state._state == "stop_left":
+            self.facing = -1
+        else:
+            self.facing = 1
 
     def reset_to_saved_state(self):
         ss = self.save_state

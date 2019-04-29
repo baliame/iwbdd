@@ -13,7 +13,7 @@ import copy
 from OpenGL.GL import *
 import numpy as np
 from PIL import Image
-from .fx import Darkroom, HSV_Rotator, Vertical_Sine_Distortion
+from .fx import FX
 
 
 class Collision(IntEnum):
@@ -50,16 +50,18 @@ class Layer(IntEnum):
     FOREGROUND = 0
     BACKGROUND_1 = 1
     BACKGROUND_2 = 2
+    SUPERFOREGROUND = 3
     LAYER_COUNT = auto()
 
 
 LayerNames = {
-    Layer.FOREGROUND: "foreground",
+    Layer.FOREGROUND: "main",
     Layer.BACKGROUND_1: "background 1",
     Layer.BACKGROUND_2: "background 2",
+    Layer.SUPERFOREGROUND: "foreground 2",
 }
 
-LayerDrawOrder = [Layer.BACKGROUND_2, Layer.BACKGROUND_1, Layer.FOREGROUND]
+LayerDrawOrder = [Layer.BACKGROUND_2, Layer.BACKGROUND_1, Layer.FOREGROUND, Layer.SUPERFOREGROUND]
 
 COLLISIONTEST_ALL_FLAGS = CollisionTest.SOLID | CollisionTest.DEADLY | CollisionTest.TRANSITION_EAST | CollisionTest.TRANSITION_NORTH | CollisionTest.TRANSITION_WEST | CollisionTest.TRANSITION_SOUTH | CollisionTest.BOSSFIGHT_INIT_TRIGGER
 COLLISIONTEST_PREVENTS_SIDE_GRAVITY = CollisionTest.CONVEYOR_SOUTH_SINGLE_SPEED | CollisionTest.CONVEYOR_NORTH_SINGLE_SPEED
@@ -97,6 +99,7 @@ class Screen:
         self.dirty_collisions = True
         self.transitions = (0, 0, 0, 0)
         self.flags = 0
+        self.fx_pipeline = []
         tile_tuple = tuple([0 for i in range(Layer.LAYER_COUNT * 2 + 1)])
         self.tiles = [[tile_tuple for x in range(Screen.SCREEN_W)] for y in range(Screen.SCREEN_H)]
         self.objects = []
@@ -119,7 +122,6 @@ class Screen:
         self.terrain_collision_data = b''
         self.all_collision_data = b''
         self.has_lens = False
-        self.fx_pipeline = []
 
     def reset_to_initial_state(self):
         self.objects = []
@@ -161,7 +163,7 @@ class Screen:
         tr_s = struct.unpack("<L", eofc_read(reader, 4))[0]
         background_id = struct.unpack("<L", eofc_read(reader, 4))[0]
         flags = struct.unpack("<L", eofc_read(reader, 4))[0]
-        return (scrid, tr_e, tr_n, tr_w, tr_s, background_id, flags, 0, 0.2, 22, 0)
+        return (scrid, tr_e, tr_n, tr_w, tr_s, background_id, flags, 0, 0.2, 22, 0, 0)
 
     def _read_header_v2(self, reader):
         scrid = struct.unpack("<L", eofc_read(reader, 4))[0]
@@ -173,7 +175,7 @@ class Screen:
         flags = struct.unpack("<L", eofc_read(reader, 4))[0]
         grav_x = struct.unpack("<f", eofc_read(reader, 4))[0]
         grav_y = struct.unpack("<f", eofc_read(reader, 4))[0]
-        return (scrid, tr_e, tr_n, tr_w, tr_s, background_id, flags, grav_x, grav_y, 22, 0)
+        return (scrid, tr_e, tr_n, tr_w, tr_s, background_id, flags, grav_x, grav_y, 22, 0, 0)
 
     def _read_header_v3(self, reader):
         scrid = struct.unpack("<L", eofc_read(reader, 4))[0]
@@ -186,7 +188,7 @@ class Screen:
         grav_x = struct.unpack("<f", eofc_read(reader, 4))[0]
         grav_y = struct.unpack("<f", eofc_read(reader, 4))[0]
         jump_frames = struct.unpack("<H", eofc_read(reader, 2))[0]
-        return (scrid, tr_e, tr_n, tr_w, tr_s, background_id, flags, grav_x, grav_y, jump_frames, 0)
+        return (scrid, tr_e, tr_n, tr_w, tr_s, background_id, flags, grav_x, grav_y, jump_frames, 0, 0)
 
     def _read_header_v4(self, reader):
         scrid = struct.unpack("<L", eofc_read(reader, 4))[0]
@@ -200,13 +202,31 @@ class Screen:
         grav_y = struct.unpack("<f", eofc_read(reader, 4))[0]
         jump_frames = struct.unpack("<H", eofc_read(reader, 2))[0]
         object_count = struct.unpack("<H", eofc_read(reader, 2))[0]
-        return (scrid, tr_e, tr_n, tr_w, tr_s, background_id, flags, grav_x, grav_y, jump_frames, object_count)
+        return (scrid, tr_e, tr_n, tr_w, tr_s, background_id, flags, grav_x, grav_y, jump_frames, object_count, 0)
 
     def _read_header_v5(self, reader):
         return self._read_header_v4(reader)
 
     def _read_header_v6(self, reader):
         return self._read_header_v5(reader)
+
+    def _read_header_v7(self, reader):
+        return self._read_header_v6(reader)
+
+    def _read_header_v8(self, reader):
+        scrid = struct.unpack("<L", eofc_read(reader, 4))[0]
+        tr_e = struct.unpack("<L", eofc_read(reader, 4))[0]
+        tr_n = struct.unpack("<L", eofc_read(reader, 4))[0]
+        tr_w = struct.unpack("<L", eofc_read(reader, 4))[0]
+        tr_s = struct.unpack("<L", eofc_read(reader, 4))[0]
+        background_id = struct.unpack("<L", eofc_read(reader, 4))[0]
+        flags = struct.unpack("<L", eofc_read(reader, 4))[0]
+        grav_x = struct.unpack("<f", eofc_read(reader, 4))[0]
+        grav_y = struct.unpack("<f", eofc_read(reader, 4))[0]
+        jump_frames = struct.unpack("<H", eofc_read(reader, 2))[0]
+        object_count = struct.unpack("<H", eofc_read(reader, 2))[0]
+        fx_count = struct.unpack("<H", eofc_read(reader, 2))[0]
+        return (scrid, tr_e, tr_n, tr_w, tr_s, background_id, flags, grav_x, grav_y, jump_frames, object_count, fx_count)
 
     def _read_header(self, reader, legacy=False):
         if legacy:
@@ -224,7 +244,11 @@ class Screen:
             elif ver == 5:
                 return self._read_header_v5(reader)
             elif ver == 6:
-                return self._read_header_v5(reader)
+                return self._read_header_v6(reader)
+            elif ver == 7:
+                return self._read_header_v7(reader)
+            elif ver == 8:
+                return self._read_header_v8(reader)
             else:
                 raise RuntimeError("Unknown version number: {0}".format(ver))
 
@@ -232,7 +256,7 @@ class Screen:
         ts_x = struct.unpack("<H", eofc_read(reader, 2))[0]
         ts_y = struct.unpack("<H", eofc_read(reader, 2))[0]
         collision = struct.unpack("<H", eofc_read(reader, 2))[0]
-        return (ts_x, ts_y, 0, 0, 0, 0, collision)
+        return (ts_x, ts_y, 0, 0, 0, 0, 0, 0, collision)
 
     def _read_tile_v5(self, reader):
         ts_x = struct.unpack("<H", eofc_read(reader, 2))[0]
@@ -240,7 +264,7 @@ class Screen:
         decor_x = struct.unpack("<H", eofc_read(reader, 2))[0]
         decor_y = struct.unpack("<H", eofc_read(reader, 2))[0]
         collision = struct.unpack("<H", eofc_read(reader, 2))[0]
-        return (ts_x, ts_y, decor_x, decor_y, 0, 0, collision)
+        return (ts_x, ts_y, decor_x, decor_y, 0, 0, 0, 0, collision)
 
     def _read_tile_v6(self, reader):
         ts_x = struct.unpack("<H", eofc_read(reader, 2))[0]
@@ -250,10 +274,22 @@ class Screen:
         decor_x_2 = struct.unpack("<H", eofc_read(reader, 2))[0]
         decor_y_2 = struct.unpack("<H", eofc_read(reader, 2))[0]
         collision = struct.unpack("<H", eofc_read(reader, 2))[0]
-        return (ts_x, ts_y, decor_x, decor_y, decor_x_2, decor_y_2, collision)
+        return (ts_x, ts_y, decor_x, decor_y, decor_x_2, decor_y_2, 0, 0, collision)
+
+    def _read_tile_v7(self, reader):
+        ts_x = struct.unpack("<H", eofc_read(reader, 2))[0]
+        ts_y = struct.unpack("<H", eofc_read(reader, 2))[0]
+        decor_x = struct.unpack("<H", eofc_read(reader, 2))[0]
+        decor_y = struct.unpack("<H", eofc_read(reader, 2))[0]
+        decor_x_2 = struct.unpack("<H", eofc_read(reader, 2))[0]
+        decor_y_2 = struct.unpack("<H", eofc_read(reader, 2))[0]
+        foredecor_x_2 = struct.unpack("<H", eofc_read(reader, 2))[0]
+        foredecor_y_2 = struct.unpack("<H", eofc_read(reader, 2))[0]
+        collision = struct.unpack("<H", eofc_read(reader, 2))[0]
+        return (ts_x, ts_y, decor_x, decor_y, decor_x_2, decor_y_2, foredecor_x_2, foredecor_y_2, collision)
 
     def _write_header(self, writer):
-        writer.write(struct.pack("<H", 6))
+        writer.write(struct.pack("<H", 8))
         writer.write(struct.pack("<L", self.screen_id))
         writer.write(struct.pack("<L", self.transitions[0]))
         writer.write(struct.pack("<L", self.transitions[1]))
@@ -265,6 +301,7 @@ class Screen:
         writer.write(struct.pack("<f", self.gravity[1]))
         writer.write(struct.pack("<H", self.jump_frames))
         writer.write(struct.pack("<H", len(self.bound_objects)))
+        writer.write(struct.pack("<H", len(self.fx_pipeline)))
 
     def _write_tile(self, writer, tile):
         writer.write(struct.pack("<H", tile[0]))
@@ -274,6 +311,8 @@ class Screen:
         writer.write(struct.pack("<H", tile[4]))
         writer.write(struct.pack("<H", tile[5]))
         writer.write(struct.pack("<H", tile[6]))
+        writer.write(struct.pack("<H", tile[7]))
+        writer.write(struct.pack("<H", tile[8]))
 
     def change_tile_graphic(self, x, y, layer, new_x, new_y):
         tile = list(self.tiles[y][x])
@@ -295,7 +334,9 @@ class Screen:
     def load_tile_data(self, tile_data):
         if is_reader_stream(tile_data):
             header = self._read_header(tile_data)
-            if self.version >= 6:
+            if self.version >= 7:
+                tile_read_func = self._read_tile_v7
+            elif self.version >= 6:
                 tile_read_func = self._read_tile_v6
             elif self.version >= 5:
                 tile_read_func = self._read_tile_v5
@@ -321,6 +362,9 @@ class Screen:
                 #  print(obj.__class__, isinstance(obj, LensParent), isinstance(obj, ActivatableLens), isinstance(obj, MovingLens))
                 self.bound_objects.append(obj)
                 self.savestate_objects.append(copy.copy(obj))
+            for i in range(header[11]):
+                fx_id = struct.unpack("<H", eofc_read(tile_data, 2))[0]
+                self.fx_pipeline.append(FX.ApplicableFXes[fx_id])
         else:
             raise RuntimeError("Only readers are allowed for tile data reading.")
         self.reset_to_initial_state()
@@ -332,6 +376,8 @@ class Screen:
                 self._write_tile(target, tile)
         for i in range(len(self.bound_objects)):
             self.bound_objects[i].write_to_writer(target)
+        for i in range(len(self.fx_pipeline)):
+            target.write(struct.pack("<H", self.fx_pipeline[i].fx_id))
 
     def render_to_window(self, wnd, layer=None):
         if self.dirty:

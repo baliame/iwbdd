@@ -388,6 +388,11 @@ uniform int   lightSourceOn[10];
 uniform vec4  lightSourceColors[10];
 uniform vec2  lightSourceLocs[10];
 uniform float fullIntensityRadius;
+uniform int   lightConeOn;
+uniform vec2  lightConeLoc;
+uniform vec4  lightConeColor;
+uniform float lightConeAngle;
+uniform float lightConeWidth;
 
 layout(location = 2) in vec2 in_screen_uv;
 layout(location = 3) in vec2 in_screen_pos;
@@ -397,7 +402,59 @@ layout(location = 0) out vec4 out_color;
 void main() {
     vec4 scr = texture(screen, in_screen_uv);
     scr.a = 0;
-
+    float HPI = 3.141592 / 2;
+    if (lightConeOn != 0) {
+        float dx = in_screen_pos.x - lightConeLoc.x;
+        float dy = in_screen_pos.y - lightConeLoc.y;
+        float r2 = dx * dx + dy * dy;
+        float r = sqrt(r2);
+        int ok = 0;
+        float fade = 1;
+        float fc = fullIntensityRadius * lightConeColor.a / 4;
+        float ang = 0;
+        if (dx == 0) {
+            if (dy < 0) {
+                ang = 3 * HPI;
+            } else {
+                ang = HPI;
+            }
+        } else {
+            ang = atan(dy, dx);
+        }
+        float diff = ang - lightConeAngle;
+        float diff2 = ang + 4 * HPI - lightConeAngle;
+        float diff3 = ang - 4 * HPI - lightConeAngle;
+        float act = min(abs(diff), min(abs(diff2), abs(diff3)));
+        if (act <= lightConeWidth) {
+            float fth = lightConeWidth * 3 / 4;
+            if (act > fth) {
+                fade = max(0, 1 - ((act - fth) / (lightConeWidth - fth)));
+            }
+            ok = 1;
+        }
+        if (r < fc) {
+            if (r > fc / 2) {
+                if (ok > 0) {
+                    fade = max(fade, 1 - ((r - fc / 2) / (fc - fc / 2)));
+                } else {
+                    fade = max(0, 1 - ((r - fc / 2) / (fc - fc / 2)));
+                }
+            } else {
+                fade = 1;
+            }
+            ok = 1;
+        }
+        if (ok > 0) {
+            float rm = lightConeColor.a;
+            float rf = fullIntensityRadius * rm;
+            float rv = rf - r;
+            float ra = rv / rf * 0.5 * fade;
+            if (rv >= 0) {
+                scr.rgb = lightConeColor.rgb * ra + scr.rgb * (1 - ra);
+                scr.a = ra + scr.a * (1 - ra);
+            }
+        }
+    }
     for (int i = 0; i < 10; i++) {
         if (lightSourceOn[i] != 0) {
             float dx = in_screen_pos.x - lightSourceLocs[i].x;
@@ -500,6 +557,67 @@ void main() {
 """.strip()
 
 
+GSH_pix_light_spot = """
+#version 430
+
+layout(binding = 1) uniform sampler2D screen;
+
+layout(location = 2) in vec2 in_screen_uv;
+layout(location = 3) in vec2 in_screen_pos;
+
+uniform vec4 color;
+uniform float r;
+uniform vec2 center;
+
+layout(location = 0) out vec4 out_color;
+
+void main() {
+    vec4 scr = texture(screen, in_screen_uv);
+    float dx = in_screen_pos.x - center.x;
+    float dy = in_screen_pos.y - center.y;
+    float d2 = dx * dx + dy * dy;
+    if (d2 >= r * r) {
+        out_color = vec4(scr.rgb, 1.0);
+    } else {
+        float d = sqrt(d2);
+        float a = 1.0 - (d / r);
+        out_color = vec4(color.rgb * a + scr.rgb * (1 - a), 1.0);
+    }
+}
+
+""".strip()
+
+GSH_pix_light_trail = """
+#version 430
+
+layout(binding = 1) uniform sampler2D screen;
+
+layout(location = 2) in vec2 in_screen_uv;
+layout(location = 3) in vec2 in_screen_pos;
+
+uniform vec4 color;
+uniform float r;
+uniform vec2 center;
+
+layout(location = 0) out vec4 out_color;
+
+void main() {
+    vec4 scr = texture(screen, in_screen_uv);
+    float dx = in_screen_pos.x - center.x;
+    float dy = in_screen_pos.y - center.y;
+    float d2 = dx * dx + dy * dy;
+    if (d2 >= r * r) {
+        out_color = vec4(scr.rgb, 1.0);
+    } else {
+        float d = sqrt(d2);
+        float a = 1.0 - (d / r);
+        out_color = vec4(color.rgb * a + scr.rgb * (1 - a), 1.0);
+    }
+}
+
+""".strip()
+
+
 _GSH_all = [
     (GL_VERTEX_SHADER, "GSH_vtx"),
     (GL_FRAGMENT_SHADER, "GSH_pix"),
@@ -517,6 +635,8 @@ _GSH_all = [
     (GL_FRAGMENT_SHADER, "GSH_fx_darkroom"),
     (GL_FRAGMENT_SHADER, "GSH_fx_hsv_rotate"),
     (GL_FRAGMENT_SHADER, "GSH_fx_vertical_sine"),
+    (GL_FRAGMENT_SHADER, "GSH_pix_light_spot"),
+    (GL_FRAGMENT_SHADER, "GSH_pix_light_trail"),
 ]
 _GSH_progs = {
     "GSHP_render": {GL_VERTEX_SHADER: "GSH_vtx", GL_FRAGMENT_SHADER: "GSH_pix"},
@@ -534,6 +654,8 @@ _GSH_progs = {
     "GSHP_fx_darkroom": {GL_VERTEX_SHADER: "GSH_vtx", GL_FRAGMENT_SHADER: "GSH_fx_darkroom"},
     "GSHP_fx_hsv_rotate": {GL_VERTEX_SHADER: "GSH_vtx", GL_FRAGMENT_SHADER: "GSH_fx_hsv_rotate"},
     "GSHP_fx_vertical_sine": {GL_VERTEX_SHADER: "GSH_vtx", GL_FRAGMENT_SHADER: "GSH_fx_vertical_sine"},
+    "GSHP_light_spot": {GL_VERTEX_SHADER: "GSH_vtx", GL_FRAGMENT_SHADER: "GSH_pix_light_spot"},
+    "GSHP_light_trail": {GL_VERTEX_SHADER: "GSH_vtx", GL_FRAGMENT_SHADER: "GSH_pix_light_trail"},
 }
 GSH_compiled = {}
 GSH_programs = {}
