@@ -269,6 +269,15 @@ class Mat4:
         ret.data[1, 1] = ca
         return ret
 
+    @classmethod
+    def rotation_sincos(cls, sa=0, ca=1):
+        ret = cls()
+        ret.data[0, 0] = ca
+        ret.data[0, 1] = -sa
+        ret.data[1, 0] = sa
+        ret.data[1, 1] = ca
+        return ret
+
     def __mul__(self, o):
         dest = self.__class__()
         dest.data = np.matmul(self.data, o.data)

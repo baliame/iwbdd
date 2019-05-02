@@ -1,7 +1,7 @@
 from .world import World
 from .player import Player
 from .screen import COLLISIONTEST_PREVENTS_SIDE_GRAVITY, COLLISIONTEST_TRANSITIONS, eofc_read
-from .common import CollisionTest, COLLISIONTEST_PREVENTS_MOVEMENT, SCREEN_SIZE_W, SCREEN_SIZE_H
+from .common import CollisionTest, COLLISIONTEST_PREVENTS_MOVEMENT, SCREEN_SIZE_W, SCREEN_SIZE_H, Controls, MOVEMENT_SPEED
 from .object import Bullet
 import struct
 from .audio_data import Audio
@@ -21,19 +21,6 @@ def bound(v, m0, m1):
             return m0
         return v
     return m1
-
-
-class Controls(IntEnum):
-    LEFT = 0
-    RIGHT = 1
-    JUMP = 2
-    SHOOT = 3
-    RESET = 4
-    SKIP = 5
-    LOOK_UP = 6
-    LOOK_DOWN = 7
-    DEV1 = 16
-    DEV2 = 17
 
 
 # 4 tiles = 96 px
@@ -76,7 +63,6 @@ class Controller:
         Controls.DEV1: glfw.KEY_K,
         Controls.DEV2: glfw.KEY_L,
     }
-    movement_speed = 2
     default_music_volume = 0.8
 
     def __init__(self, main_loop, editor_control=False):
@@ -105,6 +91,7 @@ class Controller:
         self.editor_controlled = editor_control
         main_loop.add_ticker(self)
         self.ml = main_loop
+        self.ckeys = defaultdict(bool)
 
         self.music_volume = Controller.default_music_volume
         mixer.set_num_channels(16)
@@ -347,6 +334,20 @@ class Controller:
             self.player.cached_collision = None
             # print("Frame failed: player overlapping solid object")
             return
+        if self.player.cached_collision[4][0] & CollisionTest.BONFIRE:
+            if not self.player.in_bonfire:
+                self.player.in_bonfire = True
+                self.save_state()
+                Audio.play_by_name('bonfire.ogg')
+        else:
+            self.player.in_bonfire = False
+        if self.player.cached_collision[4][0] & CollisionTest.TRIGGER:
+            if not self.player.in_trigger:
+                self.player.in_trigger = True
+                for obj in self.current_screen.objects:
+                    obj.screen_trigger(self)
+        else:
+            self.player.in_trigger = False
         if self.player.cached_collision[4][0] & CollisionTest.BOSSFIGHT_INIT_TRIGGER:
             self.start_bossfight()
         if self.player.cached_collision[4][0] & COLLISIONTEST_TRANSITIONS:
@@ -431,10 +432,10 @@ class Controller:
         mvy = 0
         change_facing = 0
         if keys[self.keybindings[Controls.LEFT]]:
-            mvx += -Controller.movement_speed
+            mvx += -MOVEMENT_SPEED
             change_facing = -1
         if keys[self.keybindings[Controls.RIGHT]]:
-            mvx += Controller.movement_speed
+            mvx += MOVEMENT_SPEED
             if change_facing == -1:
                 change_facing = 0
             else:
@@ -488,13 +489,13 @@ class Controller:
 
         conveyor_velocity = [0, 0]
         if self.player.cached_collision[0][0] & CollisionTest.CONVEYOR_NORTH_SINGLE_SPEED or self.player.cached_collision[2][0] & CollisionTest.CONVEYOR_NORTH_SINGLE_SPEED:
-            conveyor_velocity[1] += -Controller.movement_speed * 0.75
+            conveyor_velocity[1] += -MOVEMENT_SPEED * 0.75
         if self.player.cached_collision[0][0] & CollisionTest.CONVEYOR_SOUTH_SINGLE_SPEED or self.player.cached_collision[2][0] & CollisionTest.CONVEYOR_SOUTH_SINGLE_SPEED:
-            conveyor_velocity[1] += Controller.movement_speed * 0.75
+            conveyor_velocity[1] += MOVEMENT_SPEED * 0.75
         if self.player.cached_collision[3][0] & CollisionTest.CONVEYOR_WEST_SINGLE_SPEED:
-            conveyor_velocity[0] += -Controller.movement_speed * 0.75
+            conveyor_velocity[0] += -MOVEMENT_SPEED * 0.75
         if self.player.cached_collision[3][0] & CollisionTest.CONVEYOR_EAST_SINGLE_SPEED:
-            conveyor_velocity[0] += Controller.movement_speed * 0.75
+            conveyor_velocity[0] += MOVEMENT_SPEED * 0.75
 
         if change_facing:
             if change_facing < 0:
@@ -653,6 +654,9 @@ class Controller:
     def __call__(self, ml):
         if not self.suspended:
             self.trigger_cache = defaultdict(int)
+            self.ckeys = defaultdict(bool)
+            for k, v in self.keybindings.items():
+                self.ckeys[v] = (self.ml.get_key(v) == glfw.PRESS)
             self.current_screen.tick(self)
             for transition in self.current_screen.transitions:
                 trd = []

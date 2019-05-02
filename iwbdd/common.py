@@ -40,6 +40,8 @@ class CollisionTest(IntEnum):
     BULLET_INTERACTABLE = 8192
     BOSS = 8194
     BOSSFIGHT_INIT_TRIGGER = 16384
+    BONFIRE = 32768
+    TRIGGER = 65536
 
 
 COLLISIONTEST_PREVENTS_MOVEMENT = CollisionTest.SOLID | CollisionTest.CONVEYOR_EAST_SINGLE_SPEED | CollisionTest.CONVEYOR_SOUTH_SINGLE_SPEED | CollisionTest.CONVEYOR_WEST_SINGLE_SPEED | CollisionTest.CONVEYOR_NORTH_SINGLE_SPEED
@@ -57,4 +59,21 @@ COLLISIONTEST_COLORS = {
     CollisionTest.LENS: (128, 0, 0),
     CollisionTest.BOSSFIGHT_INIT_TRIGGER: (128, 128, 0),
     CollisionTest.BOSS: (254, 0, 0),
+    CollisionTest.BONFIRE: (0, 128, 128),
+    CollisionTest.TRIGGER: (128, 0, 128),
 }
+
+
+class Controls(IntEnum):
+    LEFT = 0
+    RIGHT = 1
+    JUMP = 2
+    SHOOT = 3
+    RESET = 4
+    SKIP = 5
+    LOOK_UP = 6
+    LOOK_DOWN = 7
+    DEV1 = 16
+    DEV2 = 17
+
+MOVEMENT_SPEED = 2

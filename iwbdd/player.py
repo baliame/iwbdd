@@ -61,6 +61,8 @@ class Player(Object):
         self.controller = ctrl
         self.save_state = None
         self.looking = 0
+        self.in_bonfire = False
+        self.in_trigger = False
 
     def create_save_state(self):
         self.save_state = Player(None)
@@ -121,6 +123,8 @@ class Player(Object):
         self.doublejump_blocked = False
         self.prevent_shooting = 0
         self.destroy_bullets()
+        self.in_bonfire = True
+        self.in_trigger = True
         self.save_state = None
 
     def fire(self):

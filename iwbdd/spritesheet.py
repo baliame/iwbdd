@@ -1,7 +1,6 @@
 import numpy as np
 from .common import eofc_read
 import struct
-import pygame
 from io import BytesIO
 import os.path as path
 from PIL import Image
@@ -13,6 +12,7 @@ from .pygame_oo.window import Window
 from .pygame_oo.framebuf import Framebuffer
 from OpenGL.arrays.vbo import VBO
 from .pygame_oo import logger
+
 
 # DATA FORMAT: (HEADER, [SPRITESHEETS])
 # HEADER: (<4> Number of spritesheets)
@@ -117,9 +117,11 @@ class Spritesheet:
         # self.variants[(None, 255, 1)] = self.image_surface
         self.model = Mat4.scaling(self.cell_w, self.cell_h)
 
-    def draw_cell_to(self, x, y, draw_x, draw_y, transparency):
+    def draw_cell_to(self, x, y, draw_x, draw_y, transparency, model_transform=None):
         with GSHp('GSHP_render_sheet') as prog:
             render_loc = self.model * Mat4.translation(draw_x, Window.instance.h - draw_y)
+            if model_transform is not None:
+                render_loc = model_transform * render_loc
             self.vec_buf.load_rgb_a(self.variant_color, self.variant_alpha)
             tex_idx = int(x) + self.stride * int(y)
 

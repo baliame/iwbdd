@@ -54,13 +54,17 @@ class Audio:
         Audio.audio_by_name["prepare_to_die.ogg"].sound.set_volume(0.6)
         Audio.audio_by_name["prepare_to_die_2.ogg"].sound.set_volume(0.6)
         Audio.audio_by_name['distant_thunder.ogg'].sound.set_volume(0.5)
+        Audio.audio_by_name['firelink_shrine.ogg'].sound.set_volume(0.25)
         Audio.audio_by_name['quack.ogg'].sound.set_volume(0.1)
         Audio.audio_by_name['quack2.ogg'].sound.set_volume(0.1)
         Audio.audio_by_name['omen.ogg'].sound.set_volume(0.2)
         Audio.audio_by_name['donation.ogg'].sound.set_volume(0.6)
         Audio.audio_by_name['bits.ogg'].sound.set_volume(0.5)
         Audio.audio_by_name['hit.ogg'].sound.set_volume(0.2)
+        Audio.audio_by_name['lightbolt.ogg'].sound.set_volume(0.1)
+        Audio.audio_by_name['wheelington.ogg'].sound.set_volume(0.05)
         Audio.audio_by_name['explosion.ogg'].sound.set_volume(0.5)
+        Audio.audio_by_name['bonfire.ogg'].sound.set_volume(0.2)
 
     @classmethod
     def play_by_name(cls, name, channel=None, loops=0):

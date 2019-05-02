@@ -43,6 +43,8 @@ class Collision(IntEnum):
     SOLID_BEAM_UPRIGHT_PART_2 = 23
     SOLID_BEAM_UPLEFT_PART_1 = 24
     SOLID_BEAM_UPLEFT_PART_2 = 25
+    BONFIRE = 26
+    TRIGGER = 27
     COLLISION_TYPE_COUNT = auto()
 
 
@@ -83,6 +85,8 @@ class Screen:
         0x000080: CollisionTest.SAVE_TILE,
         0x800000: CollisionTest.LENS,
         0x808000: CollisionTest.BOSSFIGHT_INIT_TRIGGER,
+        0x008080: CollisionTest.BONFIRE,
+        0x800080: CollisionTest.TRIGGER,
     }
 
     CollisionBuffer = None
@@ -533,12 +537,35 @@ class Screen:
         ly = y + bbh - 1
         for obj in self.objects:
             if obj.hitbox_type & interactable_type:
-                obw = obj.hitbox_w
-                obh = obj.hitbox_h
+                obw = obj.hitbox_w + obj.check_offset_x
+                obh = obj.hitbox_h + obj.check_offset_y
                 olx = int(obj.x) + obw
                 oly = int(obj.y) + obh
                 if len(range(max(x, int(obj.x)), min(lx, olx))) and len(range(max(y, int(obj.y)), min(ly, oly))):
                     obj.interact(ctrl)
+
+    def test_player_collision(self, ctrl, x, y, hitbox, src):
+        x = int(x)
+        y = int(y)
+        bbw = hitbox[0]
+        bbh = hitbox[1]
+        lx = x + bbw - 1
+        ly = y + bbh - 1
+        obj = ctrl.player
+        obw = obj.hitbox_w + obj.check_offset_x
+        obh = obj.hitbox_h + obj.check_offset_y
+        olx = int(obj.x) + obw
+        oly = int(obj.y) + obh
+        if len(range(max(x, int(obj.x)), min(lx, olx))) and len(range(max(y, int(obj.y)), min(ly, oly))):
+            src.interact_player(ctrl)
+
+    def test_player_collision_circle(self, ctrl, x, y, r, src):
+        x = int(x)
+        y = int(y)
+        px = ctrl.player.x
+        py = ctrl.player.y
+        if x >= px - r and x < px + ctrl.player.hitbox_w + r and y >= py - r and y < py + ctrl.player.hitbox_h + r:
+            src.interact_player(ctrl)
 
     def render_collisions_to_window(self, wnd, fbo):
         binding = Framebuffer.bound

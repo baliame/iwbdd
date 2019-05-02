@@ -9,11 +9,13 @@ GSH_vtx = """
 #version 430
 layout(location = 0) in vec2 in_pos;
 layout(location = 1) in vec2 in_uv;
+layout(location = 2) in float in_a;
 
 layout(location = 0) out vec4 out_pos;
 layout(location = 1) out vec2 out_uv;
 layout(location = 2) out vec2 out_screen_uv;
 layout(location = 3) out vec2 out_screen_pos;
+layout(location = 4) out float out_a;
 
 
 uniform mat4 view;
@@ -25,6 +27,7 @@ void main() {
     out_uv = in_uv;
     out_screen_uv = vec2((out_pos.x + 1) / 2, (out_pos.y + 1) / 2);
     out_screen_pos = (model * vec4(in_pos, 0, 1)).xy;
+    out_a = in_a;
     gl_Position = out_pos;
 }
 
@@ -580,7 +583,7 @@ void main() {
         out_color = vec4(scr.rgb, 1.0);
     } else {
         float d = sqrt(d2);
-        float a = 1.0 - (d / r);
+        float a = min(1.0 - (d / r), 0.7);
         out_color = vec4(color.rgb * a + scr.rgb * (1 - a), 1.0);
     }
 }
@@ -593,26 +596,17 @@ GSH_pix_light_trail = """
 layout(binding = 1) uniform sampler2D screen;
 
 layout(location = 2) in vec2 in_screen_uv;
-layout(location = 3) in vec2 in_screen_pos;
-
-uniform vec4 color;
-uniform float r;
-uniform vec2 center;
+layout(location = 4) in float in_a;
 
 layout(location = 0) out vec4 out_color;
 
+uniform vec4 color;
+
 void main() {
+    float a = (1.0 - abs(in_a)) / 2.0;
     vec4 scr = texture(screen, in_screen_uv);
-    float dx = in_screen_pos.x - center.x;
-    float dy = in_screen_pos.y - center.y;
-    float d2 = dx * dx + dy * dy;
-    if (d2 >= r * r) {
-        out_color = vec4(scr.rgb, 1.0);
-    } else {
-        float d = sqrt(d2);
-        float a = 1.0 - (d / r);
-        out_color = vec4(color.rgb * a + scr.rgb * (1 - a), 1.0);
-    }
+
+    out_color = vec4(color.rgb * a + scr.rgb * (1.0 - a), 1);
 }
 
 """.strip()

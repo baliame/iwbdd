@@ -65,6 +65,8 @@ class Object:
         self.hitbox_type = CollisionTest.PASSABLE
         self.hitbox_w = 0
         self.hitbox_h = 0
+        self.check_offset_x = 0
+        self.check_offset_y = 0
         self.hitbox_model = None
         self.hitbox_model_attr = (0, 0, 0, 0)
         self.hitbox_vao = glGenVertexArrays(1)
@@ -264,6 +266,12 @@ class Object:
         cls.point_selection_var = None
 
     def interact(self, ctrl):
+        pass
+
+    def interact_player(self, ctrl):
+        pass
+
+    def screen_trigger(self, ctrl):
         pass
 
     @classmethod

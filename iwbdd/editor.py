@@ -203,9 +203,9 @@ class Editor:
             else:
                 self.edited_screen = self.edited_world.screens[first_sid]
                 self.background = self.edited_screen.background
-                BG = list(Tileset.tilesets)
+                BG = list(Background.backgrounds)
                 for i in range(len(BG)):
-                    if Tileset.tilesets[BG[i]] is self.tileset:
+                    if Background.backgrounds[BG[i]] is self.background:
                         self.bg_id_id = i
         except FileNotFoundError:
             self.edited_world = World()
@@ -365,6 +365,9 @@ class Editor:
                         self.controller.player.draw_as_hitbox(wnd, (0, 255, 0))
                 wnd.use_full_viewport()
                 self.background.draw(1080, 8, 160, 120)
+                self.graphics.polygon("editor__BG__POLY1", [(1280, 640), (1280, 690), (1260, 665)], color=(255, 255, 255, 255))
+                self.graphics.polygon("editor__BG__POLY2", [(1260, 710), (1260, 760), (1280, 735)], color=(255, 255, 255, 255))
+                self.font.draw("editor__BG__APPLY", "[Apply]", 1260, 694, (255, 255, 255, 255))
 
                 if self.editing_mode == EditingMode.TERRAIN:
                     self.tileset.draw_section(Editor.ts_display_x, 768 - Editor.ts_display_y - Editor.ts_view_h * Tileset.TILE_H, Editor.ts_view_w * Tileset.TILE_W, Editor.ts_view_h * Tileset.TILE_H, self.ts_view_x, self.ts_view_y, Editor.ts_view_w, Editor.ts_view_h)
@@ -684,6 +687,27 @@ class Editor:
             if event.pos[0] >= SCREEN_SIZE_W and event.button == 1:
                 if self.point_selection_callback is not None:
                     return
+                if mousebox(event.pos[0], event.pos[1], 1260, 710, 20, 50):
+                    if not self.locked[1]:
+                        self.bg_id_id += 1
+                        if self.bg_id_id >= len(list(Background.backgrounds)):
+                            self.bg_id_id = 0
+                        self.background = Background.backgrounds[list(Background.backgrounds)[self.bg_id_id]]
+                        self.locked[1] = True
+                        return
+                if mousebox(event.pos[0], event.pos[1], 1260, 640, 20, 50):
+                    if not self.locked[1]:
+                        self.bg_id_id -= 1
+                        if self.bg_id_id < 0:
+                            self.bg_id_id = len(list(Background.backgrounds)) - 1
+                        self.background = Background.backgrounds[list(Background.backgrounds)[self.bg_id_id]]
+                        self.locked[1] = True
+                        return
+                if mousebox(event.pos[0], event.pos[1], 1260, 694, 250, 12):
+                    if not self.locked[1]:
+                        self.edited_screen.background = self.background
+                        self.locked[1] = True
+                        return
                 if self.editing_mode == EditingMode.TERRAIN:
                     b_y = self.ts_display_y + Editor.ts_view_h * Tileset.TILE_H + 8
                     c_x = self.ts_display_x
