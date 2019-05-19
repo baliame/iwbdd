@@ -254,6 +254,10 @@ class WheelingtonSpawner(Object):
     editor_frame_size = (20, 20)
     editor_properties = {
         "facing_right": (EPType.IntSelector, 0, 0, 1, 1),
+        "min_x": (EPType.IntSelector, 0, 0, 1008, 1),
+        "max_x": (EPType.IntSelector, 1008, 0, 1008, 1),
+        "min_y": (EPType.IntSelector, 0, 0, 768, 1),
+        "max_y": (EPType.IntSelector, 768, 0, 768, 1),
     }
 
     def __init__(self, screen, x=0, y=0, init_dict=None):
@@ -277,7 +281,25 @@ class WheelingtonSpawner(Object):
         self.editor_wheel.draw(wnd)
 
     def screen_trigger(self, ctrl):
-        self.screen.objects.append(Wheelington(self.screen, self.x, self.y, {"facing": "right" if self.facing > 0 else "left"}))
+        if ctrl.player.x >= self.min_x and ctrl.player.x <= self.max_x and ctrl.player.y >= self.min_y and ctrl.player.y <= self.max_y:
+            self.screen.objects.append(Wheelington(self.screen, self.x, self.y, {"facing": "right" if self.facing > 0 else "left"}))
+
+    @classmethod
+    def create_from_reader(cls, reader, screen):
+        x = struct.unpack("<H", eofc_read(reader, 2))[0]
+        y = struct.unpack("<H", eofc_read(reader, 2))[0]
+        idict = {}
+        for dest_var, spec in cls.editor_properties.items():
+            if dest_var != "facing_right":
+                continue
+            if spec[0] == EPType.IntSelector:
+                idict[dest_var] = struct.unpack("<l", eofc_read(reader, 4))[0]
+            elif spec[0] == EPType.FloatSelector:
+                idict[dest_var] = struct.unpack("<d", eofc_read(reader, 8))[0]
+            elif spec[0] == EPType.PointSelector:
+                idict[dest_var] = (struct.unpack("<H", eofc_read(reader, 2))[0], struct.unpack("<H", eofc_read(reader, 2))[0])
+        obj = cls(screen, x, y, idict)
+        return obj
 
 
 class Wheelington(Object):
